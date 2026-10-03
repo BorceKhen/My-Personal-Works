@@ -1,0 +1,223 @@
+/* Base Application Styling */
+QWidget {
+    color: #e2e8f0;
+    font-family: 'Segoe UI', Roboto, sans-serif;
+    font-size: 13px;
+}
+
+/* Main Control Panel Card Window */
+ControlPanel {
+    background-color: rgba(18, 23, 38, 0.92);
+    border: 1px solid rgba(0, 229, 255, 0.35);
+    border-radius: 12px;
+}
+
+/* Control Containers */
+QWidget#main_controls_container,
+QWidget#shape_sidebar_container,
+QWidget#preset_sidebar_container,
+QWidget#items_panel_container {
+    background: transparent;
+}
+
+/* Push Buttons */
+QPushButton {
+    background-color: rgba(30, 41, 59, 0.85);
+    color: #f1f5f9;
+    border: 1px solid rgba(0, 229, 255, 0.25);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-weight: 500;
+}
+
+QPushButton:hover {
+    background-color: rgba(0, 229, 255, 0.18);
+    border-color: #00e5ff;
+    color: #ffffff;
+}
+
+QPushButton:pressed {
+    background-color: rgba(0, 229, 255, 0.35);
+    border-color: #00e5ff;
+}
+
+QPushButton:checked {
+    background-color: rgba(0, 229, 255, 0.25);
+    border-color: #00e5ff;
+    color: #00e5ff;
+    font-weight: bold;
+}
+
+/* Clear All Button */
+QPushButton#clear_btn {
+    background-color: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #fca5a5;
+}
+
+QPushButton#clear_btn:hover {
+    background-color: rgba(239, 68, 68, 0.35);
+    border-color: #ef4444;
+    color: #ffffff;
+}
+
+/* Lock / Mode Toggle Button */
+QPushButton#lock_btn {
+    background-color: rgba(14, 165, 233, 0.15);
+    border: 1px solid rgba(14, 165, 233, 0.35);
+    color: #38bdf8;
+    font-weight: 600;
+}
+
+QPushButton#lock_btn:hover {
+    background-color: rgba(14, 165, 233, 0.25);
+    border-color: #38bdf8;
+    color: #ffffff;
+}
+
+QPushButton#lock_btn:checked {
+    background-color: rgba(245, 158, 11, 0.2);
+    border-color: #f59e0b;
+    color: #fbbf24;
+}
+
+/* Save / Load Preset Buttons */
+QPushButton#save_btn {
+    background-color: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    color: #6ee7b7;
+    font-weight: 600;
+}
+
+QPushButton#save_btn:hover {
+    background-color: rgba(16, 185, 129, 0.28);
+    border-color: #10b981;
+    color: #ffffff;
+}
+
+QPushButton#load_btn {
+    background-color: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    color: #93c5fd;
+    font-weight: 600;
+}
+
+QPushButton#load_btn:hover {
+    background-color: rgba(59, 130, 246, 0.28);
+    border-color: #3b82f6;
+    color: #ffffff;
+}
+
+/* Preset Sidebar Buttons */
+QPushButton.slot_btn {
+    background-color: rgba(30, 41, 59, 0.9);
+    border: 1px solid rgba(0, 229, 255, 0.25);
+    padding: 6px 10px;
+    font-size: 12px;
+}
+
+QPushButton.slot_save_btn {
+    background-color: rgba(16, 185, 129, 0.2);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    color: #6ee7b7;
+    padding: 4px 8px;
+    font-weight: bold;
+}
+
+QPushButton.slot_save_btn:hover {
+    background-color: rgba(16, 185, 129, 0.4);
+    color: #ffffff;
+}
+
+/* Individual Item Delete Button */
+QPushButton.item_del_btn {
+    background-color: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 4px;
+    min-width: 18px;
+    max-width: 22px;
+}
+
+QPushButton.item_del_btn:hover {
+    background-color: rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+}
+
+/* Scroll Area & Custom Scrollbars */
+QScrollArea {
+    background-color: rgba(15, 23, 42, 0.65);
+    border: 1px solid rgba(0, 229, 255, 0.2);
+    border-radius: 8px;
+}
+
+QScrollArea > QWidget > QWidget {
+    background: transparent;
+}
+
+QScrollBar:vertical {
+    border: none;
+    background: transparent;
+    width: 6px;
+    margin: 0px;
+    border-radius: 3px;
+}
+
+QScrollBar::handle:vertical {
+    background: rgba(0, 229, 255, 0.35);
+    min-height: 20px;
+    border-radius: 3px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #00e5ff;
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+QScrollBar:horizontal {
+    height: 0px;
+    background: transparent;
+}
+
+/* Checkboxes */
+QCheckBox {
+    spacing: 8px;
+    color: #cbd5e1;
+    background: transparent;
+}
+
+QCheckBox::indicator {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 229, 255, 0.4);
+    background-color: rgba(30, 41, 59, 0.85);
+}
+
+QCheckBox::indicator:hover {
+    border-color: #00e5ff;
+    background-color: rgba(0, 229, 255, 0.15);
+}
+
+QCheckBox::indicator:checked {
+    background-color: #00e5ff;
+    border-color: #00e5ff;
+    image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%230f172a' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+}
+
+/* Section Titles */
+QLabel {
+    color: #38bdf8;
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: transparent;
+}
