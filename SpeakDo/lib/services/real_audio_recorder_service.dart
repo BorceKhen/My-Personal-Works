@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
-import 'package:speech_to_text/speech_to_text.dart';
 
 class RecordingSessionResult {
   final String audioFilePath;
@@ -18,50 +17,42 @@ class RecordingSessionResult {
   });
 }
 
-/// Real hardware audio recorder & live pure speech-to-text service.
-/// Records real audio to disk and transcribes actual spoken words.
+/// Real hardware audio recorder service.
+/// Records real audio to disk as 16kHz mono PCM WAV required by Whisper and AudioPlayer.
 class RealAudioRecorderService {
   static final RealAudioRecorderService instance = RealAudioRecorderService._internal();
   RealAudioRecorderService._internal();
 
   final AudioRecorder _audioRecorder = AudioRecorder();
-  final SpeechToText _speechToText = SpeechToText();
 
-  bool _isSttAvailable = false;
   bool _isRecording = false;
-  String _currentLiveWords = '';
   String? _currentAudioPath;
   DateTime? _recordingStartTime;
 
   bool get isRecording => _isRecording;
-  String get currentLiveWords => _currentLiveWords;
 
-  /// Request permissions and initialize hardware mic & speech engine
-  Future<bool> initialize() async {
+  /// Check and request hardware microphone permission
+  Future<bool> checkPermission() async {
     try {
       final hasMic = await _audioRecorder.hasPermission();
-      if (!hasMic) {
-        debugPrint('[RealAudioRecorder] Microphone permission not granted');
-      }
-
-      _isSttAvailable = await _speechToText.initialize(
-        onError: (val) => debugPrint('[RealAudioRecorder STT Error] $val'),
-        onStatus: (val) => debugPrint('[RealAudioRecorder STT Status] $val'),
-      );
-
-      return true;
+      debugPrint('[RealAudioRecorder] Microphone permission status: $hasMic');
+      return hasMic;
     } catch (e) {
-      debugPrint('[RealAudioRecorder] Init error: $e');
+      debugPrint('[RealAudioRecorder] Permission check error: $e');
       return false;
     }
   }
 
-  /// Start recording real audio to disk and listening for speech words
-  Future<bool> startRecording({void Function(String liveWords)? onLiveSpeech}) async {
+  /// Start recording real audio to disk (16kHz mono PCM WAV)
+  Future<bool> startRecording() async {
     try {
-      await initialize();
+      final hasPerm = await checkPermission();
+      if (!hasPerm) {
+        debugPrint('[RealAudioRecorder] Cannot start recording without microphone permission');
+        _isRecording = false;
+        return false;
+      }
 
-      _currentLiveWords = '';
       _recordingStartTime = DateTime.now();
 
       String targetPath;
@@ -72,45 +63,26 @@ class RealAudioRecorderService {
           recDir.createSync(recursive: true);
         }
         final timestamp = DateTime.now().millisecondsSinceEpoch;
-        targetPath = p.join(recDir.path, 'voice_$timestamp.m4a');
+        targetPath = p.join(recDir.path, 'voice_$timestamp.wav');
       } else {
-        targetPath = 'virtual://live_voice.m4a';
+        targetPath = 'virtual://live_voice.wav';
       }
 
       _currentAudioPath = targetPath;
 
-      // Start hardware audio recorder
-      if (await _audioRecorder.hasPermission()) {
-        await _audioRecorder.start(
-          const RecordConfig(
-            encoder: AudioEncoder.aacLc,
-            bitRate: 128000,
-            sampleRate: 44100,
-            numChannels: 1,
-          ),
-          path: targetPath,
-        );
-      }
+      // Start hardware audio recorder in 16kHz mono PCM WAV
+      await _audioRecorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.wav,
+          sampleRate: 16000,
+          numChannels: 1,
+        ),
+        path: targetPath,
+      );
 
-      // Start live Speech-To-Text if engine is available
-      if (_isSttAvailable) {
-        await _speechToText.listen(
-          onResult: (result) {
-            _currentLiveWords = result.recognizedWords;
-            onLiveSpeech?.call(_currentLiveWords);
-          },
-          listenOptions: SpeechListenOptions(
-            partialResults: true,
-            cancelOnError: false,
-            listenMode: ListenMode.dictation,
-            listenFor: const Duration(minutes: 30),
-            pauseFor: const Duration(seconds: 10),
-          ),
-        );
-      }
-
-      _isRecording = true;
-      return true;
+      _isRecording = await _audioRecorder.isRecording();
+      debugPrint('[RealAudioRecorder] Hardware recording started at $targetPath (active: $_isRecording)');
+      return _isRecording;
     } catch (e) {
       debugPrint('[RealAudioRecorder] startRecording error: $e');
       _isRecording = false;
@@ -118,7 +90,7 @@ class RealAudioRecorderService {
     }
   }
 
-  /// Stop recording, flush audio to disk, and return real audio path & pure transcription
+  /// Stop recording, flush audio to disk, and return verified audio path
   Future<RecordingSessionResult> stopRecording() async {
     int durationSec = 1;
     if (_recordingStartTime != null) {
@@ -128,15 +100,11 @@ class RealAudioRecorderService {
 
     String audioPath = _currentAudioPath ?? '';
     try {
-      if (_isRecording) {
+      if (_isRecording || await _audioRecorder.isRecording()) {
         final stoppedPath = await _audioRecorder.stop();
         if (stoppedPath != null && stoppedPath.isNotEmpty) {
           audioPath = stoppedPath;
         }
-      }
-
-      if (_speechToText.isListening) {
-        await _speechToText.stop();
       }
     } catch (e) {
       debugPrint('[RealAudioRecorder] stop error: $e');
@@ -144,25 +112,25 @@ class RealAudioRecorderService {
       _isRecording = false;
     }
 
-    // Verify audio file exists on disk
+    // Verify audio file exists on disk and has real recorded bytes
     if (!kIsWeb && audioPath.isNotEmpty) {
       final file = File(audioPath);
       if (file.existsSync()) {
-        debugPrint('[RealAudioRecorder] Real audio saved at $audioPath (${file.lengthSync()} bytes)');
+        final size = file.lengthSync();
+        debugPrint('[RealAudioRecorder] Real audio verified on disk: $audioPath ($size bytes)');
+      } else {
+        debugPrint('[RealAudioRecorder] Notice: Audio file not found at $audioPath');
       }
     }
 
-    final pureText = _currentLiveWords.trim();
-
     return RecordingSessionResult(
       audioFilePath: audioPath,
-      pureTranscript: pureText,
+      pureTranscript: '',
       durationSeconds: durationSec,
     );
   }
 
   void dispose() {
     _audioRecorder.dispose();
-    _speechToText.stop();
   }
 }

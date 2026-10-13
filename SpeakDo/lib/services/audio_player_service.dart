@@ -106,10 +106,14 @@ class AudioPlayerService extends ChangeNotifier {
   Future<void> play() async {
     if (_isPlaying) return;
 
-    if (_isRealAudio) {
+    if (_isRealAudio && _currentAudioPath != null) {
       try {
         await _player.setPlaybackRate(_speed);
-        await _player.resume();
+        if (_position == Duration.zero) {
+          await _player.play(DeviceFileSource(_currentAudioPath!));
+        } else {
+          await _player.resume();
+        }
         _isPlaying = true;
         notifyListeners();
         return;

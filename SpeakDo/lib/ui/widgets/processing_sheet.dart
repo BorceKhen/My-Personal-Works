@@ -47,8 +47,6 @@ class _ProcessingSheetState extends State<ProcessingSheet> {
 
   bool _showLogs = false;
 
-  String _liveSpokenWords = '';
-
   @override
   void initState() {
     super.initState();
@@ -65,16 +63,20 @@ class _ProcessingSheetState extends State<ProcessingSheet> {
   }
 
   void _startHardwareRecording() async {
+    final started = await RealAudioRecorderService.instance.startRecording();
+    if (!started) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Microphone permission required to record audio.'),
+            backgroundColor: AppTheme.errorRed,
+          ),
+        );
+        Navigator.of(context).pop();
+      }
+      return;
+    }
     _startRecordingTimer();
-    await RealAudioRecorderService.instance.startRecording(
-      onLiveSpeech: (words) {
-        if (mounted) {
-          setState(() {
-            _liveSpokenWords = words;
-          });
-        }
-      },
-    );
   }
 
   void _startRecordingTimer() {
@@ -100,16 +102,14 @@ class _ProcessingSheetState extends State<ProcessingSheet> {
         ? sessionResult.durationSeconds
         : (_secondsRecorded > 0 ? _secondsRecorded : 5);
 
-    final finalSpokenWords = sessionResult.pureTranscript.isNotEmpty
-        ? sessionResult.pureTranscript
-        : (_liveSpokenWords.isNotEmpty ? _liveSpokenWords : null);
-
     _startPipeline(
       filePath: sessionResult.audioFilePath.isNotEmpty
           ? sessionResult.audioFilePath
-          : 'recorded_voice.m4a',
+          : 'recorded_voice.wav',
       durationSec: recordedDuration,
-      realSpeechTranscript: finalSpokenWords,
+      realSpeechTranscript: sessionResult.pureTranscript.isNotEmpty
+          ? sessionResult.pureTranscript
+          : null,
     );
   }
 
@@ -253,36 +253,7 @@ class _ProcessingSheetState extends State<ProcessingSheet> {
         ),
         const SizedBox(height: 14),
 
-        // Live Speech Transcription Preview
-        if (_liveSpokenWords.isNotEmpty) ...[
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppTheme.surfaceCard,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.accentAmber.withValues(alpha: 0.35)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.record_voice_over_rounded, size: 16, color: AppTheme.accentAmber),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    _liveSpokenWords,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppTheme.primaryText,
-                      fontStyle: FontStyle.italic,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-        ],
+
 
         // Format info
         const Text(
