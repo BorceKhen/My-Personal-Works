@@ -1,5 +1,6 @@
-﻿# Built application files
+# Built application files
 *.apk
+!SpeakDo/SpeakDo.apk
 *.aar
 *.ap_
 *.aab
@@ -59,6 +60,7 @@ captures/
 # google-services.json
 
 # Clang / CMake cache
+.clangd
 .clangd/
 .cache/
 compile_commands.json
