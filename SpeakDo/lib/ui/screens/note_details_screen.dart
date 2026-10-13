@@ -42,7 +42,10 @@ class _NoteDetailsScreenState extends State<NoteDetailsScreen> {
       });
 
       if (note != null) {
-        _audioPlayer.loadAudio(duration: Duration(seconds: note.durationSeconds));
+        _audioPlayer.loadAudio(
+          audioPath: note.audioFilePath,
+          duration: Duration(seconds: note.durationSeconds),
+        );
       }
     }
   }
@@ -326,7 +329,7 @@ class _NoteDetailsScreenState extends State<NoteDetailsScreen> {
             AudioPlayerCard(player: _audioPlayer),
             const SizedBox(height: 24),
 
-            // 2. Extracted Action Items Header
+            // 2. Pure Transcription Header & Card
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -339,14 +342,14 @@ class _NoteDetailsScreenState extends State<NoteDetailsScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Icon(
-                        Icons.checklist_rounded,
+                        Icons.text_snippet_rounded,
                         size: 18,
                         color: AppTheme.accentAmber,
                       ),
                     ),
                     const SizedBox(width: 10),
                     const Text(
-                      'Extracted Action Items',
+                      'Pure Transcription',
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
@@ -355,74 +358,20 @@ class _NoteDetailsScreenState extends State<NoteDetailsScreen> {
                     ),
                   ],
                 ),
-                IconButton(
-                  onPressed: _showAddTaskDialog,
-                  icon: const Icon(Icons.add_circle_outline_rounded, color: AppTheme.accentAmber),
-                  tooltip: 'Add Task',
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Extracted Action Items List
-            if (note.tasks.isEmpty)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceCard,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppTheme.subtleBorder),
-                ),
-                child: const Center(
-                  child: Text(
-                    'No action items detected in this voice note.',
-                    style: TextStyle(color: AppTheme.mutedText, fontSize: 13),
-                  ),
-                ),
-              )
-            else
-              ...note.tasks.map((task) {
-                return TaskItemTile(
-                  task: task,
-                  onToggleComplete: (val) => _toggleTaskComplete(task, val),
-                  onSyncCalendar: () => _syncTaskToCalendar(task),
-                  onDelete: () async {
-                    await AppDatabase.instance.deleteTask(task.id);
-                    _loadNote();
-                  },
-                );
-              }),
-            const SizedBox(height: 24),
-
-            // 3. Interactive Timestamped Transcript Header
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: AppTheme.infoIndigo.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.subtitles_rounded,
-                    size: 18,
-                    color: AppTheme.infoIndigo,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                const Text(
-                  'Timestamped Transcript',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.primaryText,
+                TextButton.icon(
+                  onPressed: _copyTranscript,
+                  icon: const Icon(Icons.copy_rounded, size: 14),
+                  label: const Text('Copy', style: TextStyle(fontSize: 12)),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppTheme.accentAmber,
+                    visualDensity: VisualDensity.compact,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 6),
             const Text(
-              'Tap any timestamp to jump the audio player directly to that segment:',
+              'Verbatim speech transcription from recording. Tap any segment to seek audio:',
               style: TextStyle(fontSize: 12, color: AppTheme.mutedText),
             ),
             const SizedBox(height: 12),
@@ -442,82 +391,154 @@ class _NoteDetailsScreenState extends State<NoteDetailsScreen> {
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: segments.map((seg) {
-                      final segSec = seg.timestamp.inSeconds;
-                      final isCurrent = currentSeconds >= segSec &&
-                          (segments.indexOf(seg) == segments.length - 1 ||
-                              currentSeconds < segments[segments.indexOf(seg) + 1].timestamp.inSeconds);
+                    children: [
+                      // Full text view
+                      SelectableText(
+                        note.fullTranscript,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          height: 1.5,
+                          color: AppTheme.primaryText,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Divider(height: 1),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Timestamp Segments:',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.mutedText,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ...segments.map((seg) {
+                        final segSec = seg.timestamp.inSeconds;
+                        final isCurrent = currentSeconds >= segSec &&
+                            (segments.indexOf(seg) == segments.length - 1 ||
+                                currentSeconds < segments[segments.indexOf(seg) + 1].timestamp.inSeconds);
 
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: InkWell(
-                          onTap: () {
-                            _audioPlayer.seek(seg.timestamp);
-                            if (!_audioPlayer.isPlaying) {
-                              _audioPlayer.play();
-                            }
-                          },
-                          borderRadius: BorderRadius.circular(8),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: isCurrent
-                                  ? AppTheme.accentAmber.withValues(alpha: 0.12)
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(8),
-                              border: isCurrent
-                                  ? Border.all(color: AppTheme.accentAmber.withValues(alpha: 0.4))
-                                  : null,
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Clickable Timestamp chip
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.slateBackground,
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(
-                                      color: isCurrent ? AppTheme.accentAmber : AppTheme.subtleBorder,
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: InkWell(
+                            onTap: () {
+                              _audioPlayer.seek(seg.timestamp);
+                              if (!_audioPlayer.isPlaying) {
+                                _audioPlayer.play();
+                              }
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: isCurrent
+                                    ? AppTheme.accentAmber.withValues(alpha: 0.12)
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                                border: isCurrent
+                                    ? Border.all(color: AppTheme.accentAmber.withValues(alpha: 0.4))
+                                    : null,
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.slateBackground,
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: isCurrent ? AppTheme.accentAmber : AppTheme.subtleBorder,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      seg.formattedTime,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: isCurrent ? AppTheme.accentAmber : AppTheme.mutedText,
+                                        fontFeatures: const [FontFeature.tabularFigures()],
+                                      ),
                                     ),
                                   ),
-                                  child: Text(
-                                    seg.formattedTime,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: isCurrent ? AppTheme.accentAmber : AppTheme.mutedText,
-                                      fontFeatures: const [FontFeature.tabularFigures()],
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      seg.text,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        height: 1.4,
+                                        color: isCurrent
+                                            ? AppTheme.primaryText
+                                            : const Color(0xFFCBD5E1),
+                                      ),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 10),
-
-                                // Sentence text with actionable indicator
-                                Expanded(
-                                  child: Text(
-                                    seg.text,
-                                    style: TextStyle(
-                                      fontSize: 13.5,
-                                      height: 1.4,
-                                      color: isCurrent
-                                          ? AppTheme.primaryText
-                                          : const Color(0xFFCBD5E1),
-                                      fontWeight: isCurrent ? FontWeight.w600 : FontWeight.normal,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    }).toList(),
+                        );
+                      }),
+                    ],
                   ),
                 );
               },
             ),
+            const SizedBox(height: 24),
+
+            // 3. Action Items (if any)
+            if (note.tasks.isNotEmpty) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: AppTheme.infoIndigo.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.checklist_rounded,
+                          size: 18,
+                          color: AppTheme.infoIndigo,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'Extracted Action Items',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primaryText,
+                        ),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    onPressed: _showAddTaskDialog,
+                    icon: const Icon(Icons.add_circle_outline_rounded, color: AppTheme.accentAmber),
+                    tooltip: 'Add Task',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ...note.tasks.map((task) {
+                return TaskItemTile(
+                  task: task,
+                  onToggleComplete: (val) => _toggleTaskComplete(task, val),
+                  onSyncCalendar: () => _syncTaskToCalendar(task),
+                  onDelete: () async {
+                    await AppDatabase.instance.deleteTask(task.id);
+                    _loadNote();
+                  },
+                );
+              }),
+            ],
           ],
         ),
       ),

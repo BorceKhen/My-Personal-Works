@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../database/app_database.dart';
@@ -180,12 +181,16 @@ class OfflinePipelineOrchestrator {
         logs: logs,
       );
 
+      final playableAudioPath = (!kIsWeb && File(inputFilePath).existsSync())
+          ? inputFilePath
+          : (wavPath.isNotEmpty ? wavPath : inputFilePath);
+
       final newNote = Note(
         id: noteId,
-        title: parseResult.title,
+        title: parseResult.title.isNotEmpty ? parseResult.title : 'Voice Note',
         summary: parseResult.summary,
         fullTranscript: transcript,
-        audioFilePath: wavPath,
+        audioFilePath: playableAudioPath,
         durationSeconds: recordedDurationSeconds > 0 ? recordedDurationSeconds : 15,
         createdAt: DateTime.now(),
         tasks: parseResult.tasks,

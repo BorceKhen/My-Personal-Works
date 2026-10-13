@@ -171,6 +171,26 @@ class AudioPlayerCard extends StatelessWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    player.isRealAudio ? Icons.volume_up_rounded : Icons.graphic_eq_rounded,
+                    size: 14,
+                    color: player.isRealAudio ? AppTheme.successEmerald : AppTheme.mutedText,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    player.isRealAudio ? 'Loudspeaker Audio Output Active' : 'Audio Track Loaded',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: player.isRealAudio ? AppTheme.successEmerald : AppTheme.mutedText,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         );

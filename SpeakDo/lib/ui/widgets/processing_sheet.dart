@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../models/note_model.dart';
 import '../../services/offline_pipeline_orchestrator.dart';
+import '../../services/real_audio_recorder_service.dart';
 import '../../theme/app_theme.dart';
 import 'live_waveform_painter.dart';
 
@@ -46,19 +47,34 @@ class _ProcessingSheetState extends State<ProcessingSheet> {
 
   bool _showLogs = false;
 
+  String _liveSpokenWords = '';
+
   @override
   void initState() {
     super.initState();
     _currentMode = widget.initialMode;
 
     if (_currentMode == ProcessingModalMode.recording) {
-      _startRecordingTimer();
+      _startHardwareRecording();
     } else {
       _startPipeline(
         filePath: widget.importedFilePath ?? 'imported_media.mp4',
         durationSec: 32,
       );
     }
+  }
+
+  void _startHardwareRecording() async {
+    _startRecordingTimer();
+    await RealAudioRecorderService.instance.startRecording(
+      onLiveSpeech: (words) {
+        if (mounted) {
+          setState(() {
+            _liveSpokenWords = words;
+          });
+        }
+      },
+    );
   }
 
   void _startRecordingTimer() {
@@ -71,34 +87,47 @@ class _ProcessingSheetState extends State<ProcessingSheet> {
     });
   }
 
-  void _stopRecordingAndProcess() {
+  void _stopRecordingAndProcess() async {
     _recordTimer?.cancel();
+    final sessionResult = await RealAudioRecorderService.instance.stopRecording();
+
+    if (!mounted) return;
     setState(() {
       _currentMode = ProcessingModalMode.pipeline;
     });
 
-    final recordedDuration = _secondsRecorded > 0 ? _secondsRecorded : 18;
+    final recordedDuration = sessionResult.durationSeconds > 0
+        ? sessionResult.durationSeconds
+        : (_secondsRecorded > 0 ? _secondsRecorded : 5);
+
+    final finalSpokenWords = sessionResult.pureTranscript.isNotEmpty
+        ? sessionResult.pureTranscript
+        : (_liveSpokenWords.isNotEmpty ? _liveSpokenWords : null);
+
     _startPipeline(
-      filePath: 'microphone://live_pcm_stream_${DateTime.now().millisecondsSinceEpoch}.wav',
+      filePath: sessionResult.audioFilePath.isNotEmpty
+          ? sessionResult.audioFilePath
+          : 'recorded_voice.m4a',
       durationSec: recordedDuration,
+      realSpeechTranscript: finalSpokenWords,
     );
   }
 
-  void _startPipeline({required String filePath, required int durationSec}) {
+  void _startPipeline({
+    required String filePath,
+    required int durationSec,
+    String? realSpeechTranscript,
+  }) {
     _pipelineSubscription?.cancel();
     _pipelineSubscription = OfflinePipelineOrchestrator.processMedia(
       inputFilePath: filePath,
       recordedDurationSeconds: durationSec,
-      customSimulatedTranscript: widget.customSimulatedTranscript,
+      customSimulatedTranscript: realSpeechTranscript ?? widget.customSimulatedTranscript,
     ).listen((status) {
       if (mounted) {
         setState(() {
           _pipelineStatus = status;
         });
-
-        if (status.stage == ProcessingStage.completed && status.createdNote != null) {
-          // Provide short auto-advance or button click
-        }
       }
     });
   }
@@ -222,11 +251,42 @@ class _ProcessingSheetState extends State<ProcessingSheet> {
             barColor: AppTheme.accentAmber,
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 14),
+
+        // Live Speech Transcription Preview
+        if (_liveSpokenWords.isNotEmpty) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceCard,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.accentAmber.withValues(alpha: 0.35)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.record_voice_over_rounded, size: 16, color: AppTheme.accentAmber),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _liveSpokenWords,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppTheme.primaryText,
+                      fontStyle: FontStyle.italic,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+        ],
 
         // Format info
         const Text(
-          'Sampling Rate: 16kHz Mono 16-bit PCM • Whisper.cpp Ready',
+          'Hardware Mic Active • Pure Speech-To-Text Decoding',
           style: TextStyle(fontSize: 12, color: AppTheme.mutedText),
         ),
         const SizedBox(height: 28),
