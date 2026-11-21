@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deckcast.local/schemas/protocol-schema.json",
+  "title": "DeckCast Signaling & DataChannel Input Protocol",
+  "description": "Shared JSON schema for DeckCast LAN WebSocket signaling and WebRTC DataChannel ('input') control packets.",
+  "oneOf": [
+    { "$ref": "#/$defs/SignalingPacket" },
+    { "$ref": "#/$defs/InputPacket" }
+  ],
+  "$defs": {
+    "MdnsServiceRecord": {
+      "type": "object",
+      "description": "mDNS/NSD TXT metadata advertised under _remotedisplay._tcp.",
+      "required": ["deviceName", "osType", "wsPort"],
+      "additionalProperties": false,
+      "properties": {
+        "deviceName": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "osType": { "type": "string", "enum": ["android", "windows"] },
+        "wsPort": { "type": "integer", "minimum": 1024, "maximum": 65535 }
+      }
+    },
+    "SignalingPacket": {
+      "oneOf": [
+        { "$ref": "#/$defs/HelloPacket" },
+        { "$ref": "#/$defs/OfferPacket" },
+        { "$ref": "#/$defs/AnswerPacket" },
+        { "$ref": "#/$defs/IceCandidatePacket" },
+        { "$ref": "#/$defs/ByePacket" },
+        { "$ref": "#/$defs/ErrorPacket" }
+      ]
+    },
+    "HelloPacket": {
+      "type": "object",
+      "required": ["type", "sessionId", "deviceName", "osType"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "hello" },
+        "sessionId": { "type": "string", "minLength": 1 },
+        "deviceName": { "type": "string", "minLength": 1 },
+        "osType": { "type": "string", "enum": ["android", "windows"] },
+        "protocolVersion": { "type": "integer", "const": 1 }
+      }
+    },
+    "OfferPacket": {
+      "type": "object",
+      "required": ["type", "sessionId", "sdp"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "offer" },
+        "sessionId": { "type": "string", "minLength": 1 },
+        "sdp": { "type": "string", "minLength": 1 }
+      }
+    },
+    "AnswerPacket": {
+      "type": "object",
+      "required": ["type", "sessionId", "sdp"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "answer" },
+        "sessionId": { "type": "string", "minLength": 1 },
+        "sdp": { "type": "string", "minLength": 1 }
+      }
+    },
+    "IceCandidatePacket": {
+      "type": "object",
+      "required": ["type", "sessionId", "sdpMid", "sdpMLineIndex", "candidate"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "ice_candidate" },
+        "sessionId": { "type": "string", "minLength": 1 },
+        "sdpMid": { "type": "string" },
+        "sdpMLineIndex": { "type": "integer", "minimum": 0 },
+        "candidate": { "type": "string", "minLength": 1 }
+      }
+    },
+    "ByePacket": {
+      "type": "object",
+      "required": ["type", "sessionId"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "bye" },
+        "sessionId": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string" }
+      }
+    },
+    "ErrorPacket": {
+      "type": "object",
+      "required": ["type", "code", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "error" },
+        "sessionId": { "type": "string" },
+        "code": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 }
+      }
+    },
+    "InputPacket": {
+      "oneOf": [
+        { "$ref": "#/$defs/PointerPacket" },
+        { "$ref": "#/$defs/KeyPacket" }
+      ]
+    },
+    "PointerPacket": {
+      "type": "object",
+      "required": ["type", "action", "x", "y"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "pointer" },
+        "action": { "type": "string", "enum": ["DOWN", "MOVE", "UP", "SCROLL"] },
+        "x": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "y": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "scrollY": { "type": "number", "default": 0.0 }
+      }
+    },
+    "KeyPacket": {
+      "type": "object",
+      "required": ["type", "action", "keyCode", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "key" },
+        "action": { "type": "string", "enum": ["DOWN", "UP"] },
+        "keyCode": { "type": "integer", "minimum": 0 },
+        "text": { "type": "string" }
+      }
+    }
+  }
+}

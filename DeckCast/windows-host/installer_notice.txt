@@ -1,0 +1,13 @@
+DeckCast Windows Studio — Local Installation & Safety Notice
+===========================================================
+
+Thank you for installing DeckCast!
+
+What this software does:
+- Streams your Windows screen to DeckCast Android controllers over your
+  local Wi-Fi/hotspot using peer-to-peer WebRTC (zero internet servers).
+- Lets you view & control Android DeckCast Hosts directly from Windows.
+- Advertises and discovers peers locally via mDNS (_remotedisplay._tcp.)
+  and hosts a local WebSocket signaling endpoint on port 9443 while active.
+- Zero telemetry, zero cloud connections, and zero background startup tasks.
+- Installs per-user into your local AppData folder (no Admin prompt needed).

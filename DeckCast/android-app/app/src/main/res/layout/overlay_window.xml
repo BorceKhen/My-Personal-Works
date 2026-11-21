@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/overlay_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Expanded Floating Window Container -->
+    <LinearLayout
+        android:id="@+id/expanded_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_overlay_window"
+        android:clipChildren="true"
+        android:clipToPadding="true"
+        android:elevation="12dp"
+        android:orientation="vertical"
+        android:padding="1.5dp">
+
+        <!-- Top Title / Drag Handle Bar -->
+        <LinearLayout
+            android:id="@+id/drag_handle_bar"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_overlay_titlebar"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="8dp">
+
+            <View
+                android:id="@+id/view_status_dot"
+                android:layout_width="9dp"
+                android:layout_height="9dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_status_dot" />
+
+            <TextView
+                android:id="@+id/tv_host_name"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Remote Host"
+                android:textColor="#F0F6FC"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btn_keyboard"
+                android:layout_width="30dp"
+                android:layout_height="26dp"
+                android:layout_marginEnd="4dp"
+                android:background="@drawable/bg_overlay_btn"
+                android:gravity="center"
+                android:text="⌨"
+                android:textColor="#CBD5E1"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/btn_minimize"
+                android:layout_width="30dp"
+                android:layout_height="26dp"
+                android:layout_marginEnd="4dp"
+                android:background="@drawable/bg_overlay_btn"
+                android:gravity="center"
+                android:text="—"
+                android:textColor="#E2E8F0"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btn_close"
+                android:layout_width="30dp"
+                android:layout_height="26dp"
+                android:background="@drawable/bg_overlay_btn"
+                android:gravity="center"
+                android:text="✕"
+                android:textColor="#FF6B81"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Video Viewport + Bottom-Right Resize Handle -->
+        <FrameLayout
+            android:id="@+id/video_container"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:background="#FF05070B">
+
+            <!-- TextureViewRenderer prevents Z-order clipping when floating windows overlap -->
+            <com.deckcast.app.webrtc.TextureViewRenderer
+                android:id="@+id/texture_video_renderer"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <!-- Soft keyboard proxy (active only when keyboard toggle removes FLAG_NOT_FOCUSABLE) -->
+            <EditText
+                android:id="@+id/et_keyboard_input"
+                android:layout_width="match_parent"
+                android:layout_height="38dp"
+                android:layout_gravity="bottom"
+                android:background="#E60F141D"
+                android:hint="Type to send keys to remote host…"
+                android:imeOptions="actionSend|flagNoExtractUi"
+                android:inputType="textNoSuggestions"
+                android:paddingStart="12dp"
+                android:paddingEnd="36dp"
+                android:singleLine="true"
+                android:textColor="#F0F6FC"
+                android:textColorHint="#94A3B8"
+                android:textSize="12sp"
+                android:visibility="gone" />
+
+            <!-- Bottom-Right Resize Corner Handle -->
+            <TextView
+                android:id="@+id/resize_handle"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_gravity="bottom|end"
+                android:background="#88101622"
+                android:gravity="center"
+                android:text="◢"
+                android:textColor="#00E5FF"
+                android:textSize="13sp" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <!-- Minimized Floating Bubble -->
+    <FrameLayout
+        android:id="@+id/minimized_bubble"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:background="@drawable/bg_overlay_bubble"
+        android:elevation="12dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tv_bubble_label"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="DC"
+            android:textColor="#00E5FF"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+    </FrameLayout>
+</FrameLayout>

@@ -22,3 +22,9 @@ A real-time 2D/3D hand-gesture air painting studio combining MediaPipe hand-land
 - **Tech Stack**: Python, OpenCV, MediaPipe, Three.js, PyInstaller, Inno Setup
 - **Download**: [FloatPaint_Setup.exe](./FloatPaint/FloatPaint_Setup.exe) (Windows Installer)
 
+### 🖥️📱 [DeckCast](./DeckCast)
+A 100% offline/local-network multi-device screen streaming and remote control system supporting Android-to-Android, Windows-to-Android, and Android-to-Windows connections over LAN WebRTC (`iceServers = emptyList()`), with independent draggable/resizable floating overlay windows on Android.
+- **Platform**: Android & Windows
+- **Tech Stack**: Kotlin, WebRTC (`webrtc-sdk`), Ktor CIO WebSockets, NsdManager, AccessibilityService, Python, `aiortc`, PyQt6, `SendInput`, Inno Setup
+- **Download**: [DeckCast.apk](./DeckCast/DeckCast.apk) (Android) | [DeckCast_Setup.exe](./DeckCast/DeckCast_Setup.exe) (Windows Installer)
+
