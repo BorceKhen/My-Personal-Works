@@ -4,8 +4,8 @@ FloatPaint (AERO-BRUSH) — Local Installation & Safety Notice
 Thank you for installing FloatPaint!
 
 What this software does:
-- Launches a 100% local 2D/3D Air-Gesture Painting Studio in your browser
-  (served only on localhost: http://127.0.0.1:8080 and ws://127.0.0.1:8765).
+- Launches a 100% local 2D/3D Air-Gesture Painting Studio desktop window
+  (communicating only over localhost: 127.0.0.1:8080 and ws://127.0.0.1:8765).
 - Uses your webcam locally via OpenCV & MediaPipe ONLY while the app is open
   to detect hand landmarks in real time. No video or images are uploaded or
   stored remotely.

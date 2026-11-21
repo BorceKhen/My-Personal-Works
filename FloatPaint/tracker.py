@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+import threading
 import time
 import urllib.request
 from pathlib import Path
@@ -267,7 +268,7 @@ def _generate_simulated_hand(t: float) -> List[List[float]]:
     return lm
 
 
-def run_tracker(args: argparse.Namespace) -> None:
+def run_tracker(args: argparse.Namespace, stop_event: Optional[threading.Event] = None) -> None:
     """Run the real-time tracking (or simulation) loop and stream UDP telemetry."""
     pipeline = HandTrackingPipeline(debounce_frames=5)
     target_dt = 1.0 / max(1, args.hz)
@@ -297,7 +298,7 @@ def run_tracker(args: argparse.Namespace) -> None:
 
     with UDPTelemetryPublisher(host=args.host, port=args.port) as publisher:
         try:
-            while True:
+            while not (stop_event is not None and stop_event.is_set()):
                 loop_start = time.perf_counter()
 
                 if args.simulate:

@@ -124,9 +124,19 @@ function setMode(nextMode) {
   }
 }
 
-function triggerDownload(filename, contentOrDataUrl, mime = 'text/plain') {
+async function triggerDownload(filename, contentOrDataUrl, mime = 'text/plain') {
+  const isDataUrl = contentOrDataUrl.startsWith('data:');
+  if (window.pywebview?.api?.save_file) {
+    try {
+      await window.pywebview.api.save_file(filename, contentOrDataUrl, isDataUrl);
+      return;
+    } catch (err) {
+      console.warn('Desktop save dialog failed, falling back to browser download:', err);
+    }
+  }
+
   const link = document.createElement('a');
-  if (contentOrDataUrl.startsWith('data:')) {
+  if (isDataUrl) {
     link.href = contentOrDataUrl;
   } else {
     const blob = new Blob([contentOrDataUrl], { type: mime });
