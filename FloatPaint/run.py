@@ -25,6 +25,26 @@ import tracker
 ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 
 
+def _pick_tcp_port(preferred: int) -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        try:
+            sock.bind(("127.0.0.1", preferred))
+            return preferred
+        except OSError:
+            sock.bind(("127.0.0.1", 0))
+            return int(sock.getsockname()[1])
+
+
+def _pick_udp_port(preferred: int) -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        try:
+            sock.bind(("127.0.0.1", preferred))
+            return preferred
+        except OSError:
+            sock.bind(("127.0.0.1", 0))
+            return int(sock.getsockname()[1])
+
+
 def _is_port_in_use(host: str, port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(0.3)
@@ -43,11 +63,9 @@ def _wait_for_port(host: str, port: int, timeout_s: float = 4.0) -> bool:
 class StudioApi:
     """JS-callable desktop API for native Save As dialogs."""
 
-    def __init__(self) -> None:
-        self.window: webview.Window | None = None
-
     def save_file(self, filename: str, content: str, is_data_url: bool = False) -> bool:
-        if self.window is None:
+        window = webview.active_window()
+        if window is None:
             return False
 
         ext = Path(filename).suffix.lower()
@@ -57,7 +75,7 @@ class StudioApi:
             ".gltf": ("glTF 2.0 JSON (*.gltf)",),
         }.get(ext, ("All files (*.*)",))
 
-        result = self.window.create_file_dialog(
+        result = window.create_file_dialog(
             webview.FileDialog.SAVE,
             save_filename=filename,
             file_types=file_types,
@@ -74,10 +92,10 @@ class StudioApi:
         return True
 
 
-def _start_bridge_thread() -> threading.Thread:
+def _start_bridge_thread(udp_port: int = 5055, ws_port: int = 8765, http_port: int = 8080) -> threading.Thread:
     def _runner() -> None:
         try:
-            asyncio.run(bridge.run_bridge("127.0.0.1", 5055, 8765, 8080))
+            asyncio.run(bridge.run_bridge("127.0.0.1", udp_port, ws_port, http_port))
         except Exception as exc:
             print(f"[AERO-BRUSH] Bridge error: {exc}")
 
@@ -112,17 +130,22 @@ def main() -> None:
         use_browser = True
         raw_args.remove("--browser")
 
-    if _is_port_in_use("127.0.0.1", 8080) or _is_port_in_use("127.0.0.1", 8765):
-        print("[AERO-BRUSH] Existing bridge detected on :8080/:8765 — reusing it.")
-    else:
-        _start_bridge_thread()
-        _wait_for_port("127.0.0.1", 8080, timeout_s=4.0)
+    udp_port = _pick_udp_port(5055)
+    ws_port = _pick_tcp_port(8765)
+    http_port = _pick_tcp_port(8080)
+
+    _start_bridge_thread(udp_port=udp_port, ws_port=ws_port, http_port=http_port)
+    _wait_for_port("127.0.0.1", http_port, timeout_s=4.0)
 
     stop_event = threading.Event()
     tracker_args = tracker.parse_args(raw_args)
+    if "--port" not in raw_args:
+        tracker_args.port = udp_port
+
+    studio_url = f"http://127.0.0.1:{http_port}/?ws={ws_port}"
 
     if use_browser:
-        webbrowser.open("http://127.0.0.1:8080")
+        webbrowser.open(studio_url)
         try:
             tracker.run_tracker(tracker_args, stop_event=stop_event)
         except KeyboardInterrupt:
@@ -134,14 +157,13 @@ def main() -> None:
     api = StudioApi()
     window = webview.create_window(
         "FloatPaint — AERO-BRUSH",
-        url="http://127.0.0.1:8080",
+        url=studio_url,
         js_api=api,
         width=1360,
         height=840,
         min_size=(960, 620),
         background_color="#0B0E14",
     )
-    api.window = window
 
     def _on_closing() -> None:
         stop_event.set()

@@ -215,7 +215,9 @@ export class InputSourceManager {
     }
 
     const host = window.location.hostname || '127.0.0.1';
-    const wsUrl = `ws://${host}:8765`;
+    const params = new URLSearchParams(window.location.search);
+    const wsPort = params.get('ws') || '8765';
+    const wsUrl = `ws://${host}:${wsPort}`;
     try {
       const ws = new WebSocket(wsUrl);
       this._ws = ws;
