@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AERO-BRUSH | 2D/3D Air-Gesture Painting Studio</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "/vendor/three/build/three.module.js",
+        "three/addons/": "/vendor/three/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="app" class="studio-shell">
+    <!-- Top Glassmorphism Navigation Bar -->
+    <header class="top-nav glass-panel">
+      <div class="brand-group">
+        <div class="brand-orb" aria-hidden="true"></div>
+        <div class="brand-text">
+          <span class="brand-title">AERO-BRUSH</span>
+          <span class="brand-subtitle">SPATIAL GESTURE STUDIO</span>
+        </div>
+      </div>
+
+      <div class="mode-toggle" role="tablist" aria-label="Canvas Dimension Mode">
+        <button
+          id="btn-mode-2d"
+          class="mode-btn air-target is-active"
+          data-action="mode-2d"
+          role="tab"
+          aria-selected="true"
+          title="Switch to 2D Anti-Aliased Canvas"
+        >
+          <span class="mode-dot mode-dot-cyan"></span>
+          2D Canvas
+          <svg class="dwell-ring" viewBox="0 0 48 48" aria-hidden="true">
+            <rect x="2" y="2" width="44" height="44" rx="10" pathLength="100"></rect>
+          </svg>
+        </button>
+        <button
+          id="btn-mode-3d"
+          class="mode-btn air-target"
+          data-action="mode-3d"
+          role="tab"
+          aria-selected="false"
+          title="Switch to 3D Three.js Space"
+        >
+          <span class="mode-dot mode-dot-magenta"></span>
+          3D Space
+          <svg class="dwell-ring" viewBox="0 0 48 48" aria-hidden="true">
+            <rect x="2" y="2" width="44" height="44" rx="10" pathLength="100"></rect>
+          </svg>
+        </button>
+      </div>
+
+      <div class="telemetry-bar">
+        <div id="gesture-pill" class="gesture-pill state-IDLE" title="Active Debounced Gesture State">
+          <span class="pill-pulse"></span>
+          <span id="gesture-pill-label">IDLE</span>
+        </div>
+
+        <div class="telemetry-readout">
+          <div class="telem-metric">
+            <span class="telem-label">FPS</span>
+            <span id="telem-fps" class="telem-value">60</span>
+          </div>
+          <div class="telem-divider"></div>
+          <div id="udp-status" class="udp-status is-disconnected" title="UDP :5055 / WebSocket :8765 Status">
+            <span class="status-led"></span>
+            <span id="udp-status-text">UDP :5055 — STANDBY</span>
+          </div>
+        </div>
+
+        <div class="source-switcher" title="Input Source">
+          <label class="sr-only" for="input-source-select">Input Source</label>
+          <select id="input-source-select" class="source-select">
+            <option value="auto">Auto (UDP :5055)</option>
+            <option value="webcam">Browser Cam (JS)</option>
+            <option value="simulator">Mouse Simulator</option>
+          </select>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Studio Workspace -->
+    <main class="workspace">
+      <!-- Left Floating Air-Hover Tool Dock -->
+      <aside class="tool-dock glass-panel" aria-label="Floating Tool Dock">
+        <section class="dock-section">
+          <div class="dock-label">PALETTE</div>
+          <div id="swatch-grid" class="swatch-grid">
+            <!-- Swatches injected by main.js (min 48x48px air hitboxes) -->
+          </div>
+          <label class="custom-color-btn air-target" title="Custom Brush Color">
+            <input id="custom-color-input" type="color" value="#00F0FF" />
+            <span>Custom</span>
+          </label>
+        </section>
+
+        <div class="dock-divider"></div>
+
+        <section class="dock-section">
+          <div class="dock-header-row">
+            <span class="dock-label">RADIUS</span>
+            <span id="brush-radius-value" class="dock-value">10px</span>
+          </div>
+          <div class="slider-air-group">
+            <button
+              id="btn-radius-down"
+              class="stepper-btn air-target"
+              data-action="radius-down"
+              title="Decrease Brush Radius"
+              aria-label="Decrease Brush Radius"
+            >
+              −
+            </button>
+            <input
+              id="brush-radius-slider"
+              class="studio-slider"
+              type="range"
+              min="2"
+              max="30"
+              step="1"
+              value="10"
+              aria-label="Brush Radius Slider"
+            />
+            <button
+              id="btn-radius-up"
+              class="stepper-btn air-target"
+              data-action="radius-up"
+              title="Increase Brush Radius"
+              aria-label="Increase Brush Radius"
+            >
+              +
+            </button>
+          </div>
+        </section>
+
+        <section id="z-plane-section" class="dock-section is-3d-control">
+          <div class="dock-header-row">
+            <span class="dock-label">Z-PLANE</span>
+            <span id="z-plane-value" class="dock-value">0.00</span>
+          </div>
+          <button
+            id="btn-z-lock"
+            class="dock-action-btn air-target"
+            data-action="toggle-z-lock"
+            title="Lock 3D stroke depth to Z-Plane slider instead of palm depth"
+          >
+            <span class="btn-icon">⌖</span>
+            <span id="z-lock-label">Z-Lock: OFF</span>
+          </button>
+          <input
+            id="z-plane-slider"
+            class="studio-slider"
+            type="range"
+            min="-1.0"
+            max="1.0"
+            step="0.05"
+            value="0.0"
+            aria-label="Z-Plane Depth Lock Slider"
+          />
+        </section>
+
+        <div class="dock-divider"></div>
+
+        <section class="dock-section dock-actions">
+          <button
+            id="btn-undo"
+            class="dock-action-btn air-target"
+            data-action="undo"
+            title="Undo Last Stroke (Ctrl+Z)"
+          >
+            <span class="btn-icon">↶</span>
+            <span>Undo</span>
+          </button>
+          <button
+            id="btn-clear"
+            class="dock-action-btn btn-danger air-target"
+            data-action="clear"
+            title="Clear Canvas"
+          >
+            <span class="btn-icon">✕</span>
+            <span>Clear</span>
+          </button>
+          <button
+            id="btn-export-png"
+            class="dock-action-btn btn-accent air-target only-2d"
+            data-action="export-png"
+            title="Export 2D Artwork as .PNG"
+          >
+            <span class="btn-icon">⤓</span>
+            <span>Export .PNG</span>
+          </button>
+          <button
+            id="btn-export-obj"
+            class="dock-action-btn btn-accent air-target only-3d hidden"
+            data-action="export-obj"
+            title="Export 3D Sculpture as .OBJ"
+          >
+            <span class="btn-icon">⤓</span>
+            <span>Export .OBJ</span>
+          </button>
+          <button
+            id="btn-export-gltf"
+            class="dock-action-btn btn-accent-alt air-target only-3d hidden"
+            data-action="export-gltf"
+            title="Export 3D Sculpture as .GLTF"
+          >
+            <span class="btn-icon">⤓</span>
+            <span>Export .GLTF</span>
+          </button>
+        </section>
+      </aside>
+
+      <!-- Center Viewport (2D Canvas + 3D Three.js Space) -->
+      <section class="viewport-stage" aria-label="Painting Viewport">
+        <div class="studio-grid-bg" aria-hidden="true"></div>
+
+        <!-- 2D High-DPI Canvas Layer -->
+        <canvas id="canvas-2d" class="viewport-canvas is-active"></canvas>
+
+        <!-- 3D Three.js Container -->
+        <div id="viewport-3d" class="viewport-3d hidden"></div>
+
+        <!-- Floating Fingertip Air Reticle + 0.8s Dwell Progress Ring -->
+        <div id="air-reticle" class="air-reticle state-IDLE" aria-hidden="true">
+          <svg class="reticle-dwell-svg" viewBox="0 0 64 64">
+            <circle class="reticle-dwell-track" cx="32" cy="32" r="28"></circle>
+            <circle id="reticle-dwell-arc" class="reticle-dwell-arc" cx="32" cy="32" r="28"></circle>
+          </svg>
+          <div id="reticle-brush-ring" class="reticle-brush-ring"></div>
+          <div class="reticle-core"></div>
+          <div id="reticle-tag" class="reticle-tag">IDLE</div>
+        </div>
+
+        <!-- Subtle Bottom-Left Controls Legend -->
+        <div class="hud-legend glass-panel">
+          <span class="legend-item"><strong class="c-magenta">DRAW</strong> Index Up</span>
+          <span class="legend-item"><strong class="c-cyan">HOVER</strong> Index+Mid (0.8s Dwell)</span>
+          <span class="legend-item"><strong class="c-amber">PINCH</strong> Scale Brush</span>
+          <span class="legend-item"><strong class="c-orange">ERASE</strong> Open Palm</span>
+          <span class="legend-item"><strong class="c-violet">ORBIT</strong> Closed Fist</span>
+        </div>
+
+        <!-- Bottom-Right PiP Hand Skeleton Monitor -->
+        <aside id="pip-monitor" class="pip-monitor glass-panel" aria-label="Hand Skeleton Monitor">
+          <div class="pip-header">
+            <span class="pip-title">HAND MONITOR</span>
+            <span id="pip-xyz" class="pip-xyz">0.50, 0.50, +0.00</span>
+          </div>
+          <div class="pip-body">
+            <video id="pip-webcam-video" class="pip-video hidden" autoplay playsinline muted></video>
+            <canvas id="pip-skeleton-canvas" class="pip-canvas"></canvas>
+          </div>
+          <div class="pip-footer">
+            <span id="pip-joint-hint">Index (8): Tracking</span>
+            <span id="pip-pinch-readout">Pinch: 0.12</span>
+          </div>
+        </aside>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

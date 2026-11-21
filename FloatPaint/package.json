@@ -1,0 +1,10 @@
+{
+  "name": "aero-brush",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "AERO-BRUSH 2D/3D Hand-Gesture Air Painting Studio Frontend",
+  "dependencies": {
+    "three": "^0.170.0"
+  }
+}

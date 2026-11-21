@@ -3,6 +3,7 @@
 !Image Compressor/ImageCompressor.apk
 !Overlay Customization/OverlayController_Setup.exe
 !Overlay Customization/OverlayController.exe
+!FloatPaint/FloatPaint_Setup.exe
 *.aar
 *.ap_
 *.aab
@@ -85,6 +86,9 @@ installer_output/
 venv/
 env/
 .env
+
+# Node dependencies
+node_modules/
 
 # Editor
 .vscode/
