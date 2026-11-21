@@ -1,8 +1,7 @@
 /**
- * Telemetry input sources:
- * 1. WebSocket (:8765) bridge receiving UDP (:5055) telemetry from tracker.py
- * 2. Built-in MediaPipe JS Webcam Fallback (@mediapipe/tasks-vision)
- * 3. Built-in Mouse-to-Hand Simulator with articulated 21-landmark synthesis
+ * Camera telemetry input sources:
+ * 1. Python OpenCV + MediaPipe tracker via WebSocket (:8765) + /api/cameras
+ * 2. Browser MediaPipe JS webcam fallback when running standalone without run.py
  */
 
 import { GESTURE_STATES } from './state.js';
@@ -109,53 +108,6 @@ function classifyLandmarksJS(lm) {
   return { state: GESTURE_STATES.IDLE, pinchDist };
 }
 
-function synthesizeHandLandmarks(nx, ny, nz, state, pinchDist) {
-  const palm = 0.16 + nz * 0.04;
-  const wrist = [nx - 0.03, Math.min(0.95, ny + palm * 1.45), 0];
-  const lm = Array.from({ length: 21 }, () => [...wrist]);
-
-  lm[1] = [wrist[0] - 0.04, wrist[1] - palm * 0.3, 0];
-  lm[2] = [wrist[0] - 0.06, wrist[1] - palm * 0.55, 0];
-
-  if (state === GESTURE_STATES.ERASE) {
-    lm[3] = [wrist[0] - 0.09, wrist[1] - palm * 0.72, 0];
-    lm[4] = [wrist[0] - 0.12, wrist[1] - palm * 0.88, 0];
-  } else if (state === GESTURE_STATES.PINCH_SCALE) {
-    lm[3] = [nx - pinchDist * 1.2, ny + 0.03, 0];
-    lm[4] = [nx - pinchDist * 0.7, ny + pinchDist * 0.7, 0];
-  } else {
-    lm[3] = [wrist[0] - 0.04, wrist[1] - palm * 0.64, 0];
-    lm[4] = [wrist[0] - 0.01, wrist[1] - palm * 0.58, 0];
-  }
-
-  const fingerSpecs = [
-    { base: 5, dx: -0.02, ext: state !== GESTURE_STATES.ORBIT_3D },
-    { base: 9, dx: 0.01, ext: state === GESTURE_STATES.HOVER || state === GESTURE_STATES.ERASE },
-    { base: 13, dx: 0.04, ext: state === GESTURE_STATES.ERASE },
-    { base: 17, dx: 0.07, ext: state === GESTURE_STATES.ERASE },
-  ];
-
-  for (const spec of fingerSpecs) {
-    const mcp = [wrist[0] + spec.dx, wrist[1] - palm, 0];
-    lm[spec.base] = mcp;
-    if (spec.base === 5 && state !== GESTURE_STATES.ORBIT_3D) {
-      lm[6] = [mcp[0] + (nx - mcp[0]) * 0.45, mcp[1] + (ny - mcp[1]) * 0.45, 0];
-      lm[7] = [mcp[0] + (nx - mcp[0]) * 0.75, mcp[1] + (ny - mcp[1]) * 0.75, 0];
-      lm[8] = [nx, ny, 0];
-    } else if (spec.ext) {
-      lm[spec.base + 1] = [mcp[0] + spec.dx * 0.15, mcp[1] - palm * 0.42, 0];
-      lm[spec.base + 2] = [mcp[0] + spec.dx * 0.25, mcp[1] - palm * 0.72, 0];
-      lm[spec.base + 3] = [mcp[0] + spec.dx * 0.35, mcp[1] - palm * 0.98, 0];
-    } else {
-      lm[spec.base + 1] = [mcp[0], mcp[1] - 0.02, 0];
-      lm[spec.base + 2] = [mcp[0], mcp[1] + 0.02, 0];
-      lm[spec.base + 3] = [mcp[0], mcp[1] + 0.05, 0];
-    }
-  }
-
-  return lm;
-}
-
 export class InputSourceManager {
   constructor({ stageEl, videoEl, onTelemetry, onConnectionChange }) {
     this.stageEl = stageEl;
@@ -163,26 +115,15 @@ export class InputSourceManager {
     this.onTelemetry = onTelemetry;
     this.onConnectionChange = onConnectionChange;
 
-    this.mode = 'auto'; // 'auto' | 'webcam' | 'simulator'
+    this.mode = 'python'; // 'python' | 'browser-cam' | 'none'
+    this.activeCameraLabel = '';
     this._ws = null;
     this._wsRetryTimer = null;
+    this._watchdogTimer = null;
     this._udpLastPacketMs = 0;
     this._udpConnected = false;
 
-    // Mouse simulator state
-    this._sim = {
-      nx: 0.5,
-      ny: 0.5,
-      nz: 0.0,
-      leftDown: false,
-      rightDown: false,
-      eraseKey: false,
-      pinchKey: false,
-      pinchDist: 0.024,
-      activeInsideWindow: false,
-    };
-
-    // Browser MediaPipe JS fallback state
+    // Browser MediaPipe JS fallback state (only used if bridge runs standalone)
     this._camStream = null;
     this._handLandmarker = null;
     this._camLoopId = null;
@@ -191,21 +132,87 @@ export class InputSourceManager {
     this._zFilter = new OneEuroFilterJS(1.0, 0.4, 1.0);
     this._debounceBuf = [];
     this._confirmedState = GESTURE_STATES.IDLE;
-
-    this._bindSimulatorEvents();
   }
 
   start() {
     this._connectWebSocket();
-    this._startSimTicker();
+    this._startWatchdog();
   }
 
-  setMode(mode) {
-    this.mode = mode;
-    if (mode === 'webcam') {
-      this._startBrowserWebcam();
-    } else {
+  async listAvailableCameras() {
+    try {
+      const resp = await fetch('/api/cameras', { cache: 'no-store' });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (Array.isArray(data.cameras)) {
+          return {
+            backend: 'python',
+            activeValue:
+              typeof data.activeIndex === 'number' ? `py:${data.activeIndex}` : '',
+            cameras: data.cameras.map((cam) => ({
+              value: `py:${cam.index}`,
+              label: cam.name || `Camera ${cam.index}`,
+            })),
+          };
+        }
+      }
+    } catch {
+      // Fall through to browser mediaDevices enumeration
+    }
+
+    if (!navigator.mediaDevices?.enumerateDevices) {
+      return { backend: 'browser', activeValue: '', cameras: [] };
+    }
+
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoInputs = devices.filter((d) => d.kind === 'videoinput');
+      return {
+        backend: 'browser',
+        activeValue: videoInputs.length > 0 ? `js:${videoInputs[0].deviceId}` : '',
+        cameras: videoInputs.map((d, idx) => ({
+          value: `js:${d.deviceId}`,
+          label: d.label || `Camera ${idx + 1}`,
+        })),
+      };
+    } catch {
+      return { backend: 'browser', activeValue: '', cameras: [] };
+    }
+  }
+
+  async selectCamera(value, label = '') {
+    this.activeCameraLabel = label;
+
+    if (!value) {
+      this.mode = 'none';
       this._stopBrowserWebcam();
+      this.onConnectionChange({
+        udpConnected: false,
+        source: 'none',
+        cameraLabel: '',
+      });
+      return;
+    }
+
+    if (value.startsWith('py:')) {
+      this.mode = 'python';
+      this._stopBrowserWebcam();
+      const idx = Number(value.slice(3));
+      this._markUdpDisconnected();
+      try {
+        await fetch(`/api/camera?index=${encodeURIComponent(idx)}`, {
+          method: 'POST',
+        });
+      } catch (err) {
+        console.warn('[AERO-BRUSH] Failed to switch Python camera:', err);
+      }
+      return;
+    }
+
+    if (value.startsWith('js:')) {
+      this.mode = 'browser-cam';
+      const deviceId = value.slice(3);
+      await this._startBrowserWebcam(deviceId);
     }
   }
 
@@ -223,13 +230,17 @@ export class InputSourceManager {
       this._ws = ws;
 
       ws.onmessage = (evt) => {
-        if (this.mode === 'webcam' || this.mode === 'simulator') return;
+        if (this.mode !== 'python') return;
         try {
           const data = JSON.parse(evt.data);
           this._udpLastPacketMs = performance.now();
           if (!this._udpConnected) {
             this._udpConnected = true;
-            this.onConnectionChange({ udpConnected: true, source: 'udp' });
+            this.onConnectionChange({
+              udpConnected: true,
+              source: 'python',
+              cameraLabel: this.activeCameraLabel,
+            });
           }
           this.onTelemetry({
             state: data.state || GESTURE_STATES.IDLE,
@@ -237,7 +248,7 @@ export class InputSourceManager {
             pinch_dist: typeof data.pinch_dist === 'number' ? data.pinch_dist : 0.12,
             landmarks: Array.isArray(data.landmarks) ? data.landmarks : [],
             fps: data.fps || 60,
-            source: 'udp',
+            source: 'camera',
           });
         } catch {
           // Ignore malformed datagram
@@ -268,115 +279,34 @@ export class InputSourceManager {
   _markUdpDisconnected() {
     if (this._udpConnected) {
       this._udpConnected = false;
-      this.onConnectionChange({ udpConnected: false, source: this.mode });
+      this.onConnectionChange({
+        udpConnected: false,
+        source: this.mode,
+        cameraLabel: this.activeCameraLabel,
+      });
     }
   }
 
-  _bindSimulatorEvents() {
-    const updateCoords = (e) => {
-      const nx = Math.max(0, Math.min(1, e.clientX / Math.max(1, window.innerWidth)));
-      const ny = Math.max(0, Math.min(1, e.clientY / Math.max(1, window.innerHeight)));
-      this._sim.nx = nx;
-      this._sim.ny = ny;
-      this._sim.clientX = e.clientX;
-      this._sim.clientY = e.clientY;
-      this._sim.activeInsideWindow = true;
-    };
-
-    window.addEventListener('pointermove', updateCoords);
-
-    this.stageEl.addEventListener('pointerdown', (e) => {
-      updateCoords(e);
-      if (e.button === 0) this._sim.leftDown = true;
-      if (e.button === 2) this._sim.rightDown = true;
-    });
-
-    window.addEventListener('pointerup', (e) => {
-      if (e.button === 0) this._sim.leftDown = false;
-      if (e.button === 2) this._sim.rightDown = false;
-    });
-
-    this.stageEl.addEventListener('contextmenu', (e) => {
-      if (this._shouldRunSimulator()) e.preventDefault();
-    });
-
-    this.stageEl.addEventListener(
-      'wheel',
-      (e) => {
-        if (!this._shouldRunSimulator()) return;
-        if (this._sim.pinchKey) {
-          e.preventDefault();
-          this._sim.pinchDist = Math.max(0.008, Math.min(0.044, this._sim.pinchDist - e.deltaY * 0.00004));
-        } else if (e.shiftKey) {
-          e.preventDefault();
-          this._sim.nz = Math.max(-1, Math.min(1, this._sim.nz - e.deltaY * 0.0015));
-        }
-      },
-      { passive: false }
-    );
-
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'e' || e.key === 'E') this._sim.eraseKey = true;
-      if (e.key === 'p' || e.key === 'P' || e.key === 'Alt') this._sim.pinchKey = true;
-    });
-
-    window.addEventListener('keyup', (e) => {
-      if (e.key === 'e' || e.key === 'E') this._sim.eraseKey = false;
-      if (e.key === 'p' || e.key === 'P' || e.key === 'Alt') this._sim.pinchKey = false;
-    });
-  }
-
-  _shouldRunSimulator() {
-    return this.mode === 'simulator';
-  }
-
-  _startSimTicker() {
-    let lastTick = performance.now();
-    const tick = () => {
+  _startWatchdog() {
+    const check = () => {
       const now = performance.now();
-      const dt = Math.max(1, now - lastTick);
-      lastTick = now;
-
       if (this._udpConnected && now - this._udpLastPacketMs > 1500) {
         this._markUdpDisconnected();
       }
-
-      if (this._shouldRunSimulator() && this._sim.activeInsideWindow) {
-        let state = GESTURE_STATES.HOVER;
-        if (this._sim.rightDown) state = GESTURE_STATES.ORBIT_3D;
-        else if (this._sim.pinchKey) state = GESTURE_STATES.PINCH_SCALE;
-        else if (this._sim.eraseKey) state = GESTURE_STATES.ERASE;
-        else if (this._sim.leftDown) state = GESTURE_STATES.DRAW;
-
-        const pinchDist = state === GESTURE_STATES.PINCH_SCALE ? this._sim.pinchDist : 0.14;
-        const landmarks = synthesizeHandLandmarks(
-          this._sim.nx,
-          this._sim.ny,
-          this._sim.nz,
-          state,
-          pinchDist
-        );
-
-        this.onTelemetry({
-          state,
-          cursor: [this._sim.nx, this._sim.ny, this._sim.nz],
-          pinch_dist: pinchDist,
-          landmarks,
-          fps: Math.min(120, Math.round(1000 / dt)),
-          source: 'simulator',
-          clientX: this._sim.clientX,
-          clientY: this._sim.clientY,
-        });
-      }
-      requestAnimationFrame(tick);
+      this._watchdogTimer = setTimeout(check, 500);
     };
-    requestAnimationFrame(tick);
+    this._watchdogTimer = setTimeout(check, 500);
   }
 
-  async _startBrowserWebcam() {
+  async _startBrowserWebcam(deviceId = '') {
+    this._stopBrowserWebcam();
     try {
+      const videoConstraint = deviceId
+        ? { deviceId: { exact: deviceId }, width: 640, height: 480 }
+        : { width: 640, height: 480, facingMode: 'user' };
+
       this._camStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480, facingMode: 'user' },
+        video: videoConstraint,
       });
       this.videoEl.srcObject = this._camStream;
       this.videoEl.classList.remove('hidden');
@@ -400,12 +330,16 @@ export class InputSourceManager {
         minTrackingConfidence: 0.75,
       });
 
-      this.onConnectionChange({ udpConnected: false, source: 'webcam' });
+      this.onConnectionChange({
+        udpConnected: false,
+        source: 'browser-cam',
+        cameraLabel: this.activeCameraLabel,
+      });
       let lastVideoTime = -1;
       let lastFrameMs = performance.now();
 
       const detectLoop = () => {
-        if (this.mode !== 'webcam') return;
+        if (this.mode !== 'browser-cam') return;
         const nowMs = performance.now();
         if (this.videoEl.readyState >= 2 && this.videoEl.currentTime !== lastVideoTime) {
           lastVideoTime = this.videoEl.currentTime;
@@ -415,7 +349,6 @@ export class InputSourceManager {
 
           let lm = null;
           if (result.landmarks && result.landmarks.length > 0) {
-            // Mirror X for natural selfie interaction
             lm = result.landmarks[0].map((p) => [1 - p.x, p.y, p.z]);
           }
 
@@ -447,18 +380,20 @@ export class InputSourceManager {
             pinch_dist: pinchDist,
             landmarks: lm || [],
             fps,
-            source: 'webcam',
+            source: 'browser-cam',
           });
         }
         this._camLoopId = requestAnimationFrame(detectLoop);
       };
       this._camLoopId = requestAnimationFrame(detectLoop);
     } catch (err) {
-      console.warn('[AERO-BRUSH] Browser webcam fallback unavailable:', err);
-      this.mode = 'simulator';
-      const selectEl = document.getElementById('input-source-select');
-      if (selectEl) selectEl.value = 'simulator';
+      console.warn('[AERO-BRUSH] Browser webcam unavailable:', err);
       this._stopBrowserWebcam();
+      this.onConnectionChange({
+        udpConnected: false,
+        source: 'none',
+        cameraLabel: this.activeCameraLabel,
+      });
     }
   }
 

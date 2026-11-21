@@ -10,11 +10,13 @@ import argparse
 import asyncio
 import base64
 import hashlib
+import json
 import mimetypes
 import struct
 import sys
 from pathlib import Path
-from typing import Dict, Optional, Set, Tuple
+from typing import Any, Dict, Optional, Set, Tuple
+from urllib.parse import parse_qs, urlsplit
 
 WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 PROJECT_ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -200,17 +202,55 @@ def _resolve_static_path(req_path: str) -> Tuple[Optional[Path], Optional[str]]:
     return None, None
 
 
+async def _send_json(writer: asyncio.StreamWriter, status: str, payload: Dict[str, Any]) -> None:
+    body = json.dumps(payload).encode("utf-8")
+    resp = (
+        f"HTTP/1.1 {status}\r\n"
+        "Content-Type: application/json; charset=utf-8\r\n"
+        f"Content-Length: {len(body)}\r\n"
+        "Cache-Control: no-cache\r\n"
+        "Connection: close\r\n\r\n"
+    ).encode("ascii") + body
+    writer.write(resp)
+    await writer.drain()
+
+
 async def handle_http_client(
     reader: asyncio.StreamReader,
     writer: asyncio.StreamWriter,
+    camera_api: Optional[Any] = None,
 ) -> None:
-    """Serve the AERO-BRUSH static frontend and local Three.js assets."""
+    """Serve the AERO-BRUSH static frontend, local Three.js assets, and camera API."""
     try:
         raw = await asyncio.wait_for(reader.readuntil(b"\r\n\r\n"), timeout=5.0)
         request_line = raw.decode("latin1").split("\r\n", 1)[0]
         parts = request_line.split(" ")
         method = parts[0].upper() if len(parts) >= 1 else "GET"
         req_path = parts[1] if len(parts) >= 2 else "/"
+        parsed = urlsplit(req_path)
+
+        if parsed.path == "/api/cameras" and method == "GET":
+            if camera_api is None:
+                await _send_json(writer, "200 OK", {"cameras": None, "activeIndex": None})
+            else:
+                cams = await asyncio.to_thread(camera_api.list_cameras)
+                await _send_json(writer, "200 OK", {"cameras": cams, "activeIndex": camera_api.active_index})
+            return
+
+        if parsed.path == "/api/camera" and method in ("POST", "GET"):
+            if camera_api is None:
+                await _send_json(writer, "404 Not Found", {"ok": False, "error": "Camera controller unavailable"})
+                return
+            qs = parse_qs(parsed.query)
+            raw_idx = (qs.get("index") or [None])[0]
+            try:
+                idx = int(raw_idx)
+            except (TypeError, ValueError):
+                await _send_json(writer, "400 Bad Request", {"ok": False, "error": "Invalid camera index"})
+                return
+            ok = await asyncio.to_thread(camera_api.select_camera, idx)
+            await _send_json(writer, "200 OK", {"ok": ok, "activeIndex": camera_api.active_index})
+            return
 
         if method not in ("GET", "HEAD"):
             writer.write(b"HTTP/1.1 405 Method Not Allowed\r\nConnection: close\r\n\r\n")
@@ -264,7 +304,13 @@ async def handle_http_client(
             pass
 
 
-async def run_bridge(host: str, udp_port: int, ws_port: int, http_port: int) -> None:
+async def run_bridge(
+    host: str,
+    udp_port: int,
+    ws_port: int,
+    http_port: int,
+    camera_api: Optional[Any] = None,
+) -> None:
     """Start UDP listener, WebSocket telemetry server, and static HTTP server."""
     loop = asyncio.get_running_loop()
     hub = TelemetryHub()
@@ -278,7 +324,11 @@ async def run_bridge(host: str, udp_port: int, ws_port: int, http_port: int) -> 
         host,
         ws_port,
     )
-    http_server = await asyncio.start_server(handle_http_client, host, http_port)
+    http_server = await asyncio.start_server(
+        lambda r, w: handle_http_client(r, w, camera_api=camera_api),
+        host,
+        http_port,
+    )
 
     print(f"[AERO-BRUSH] UDP telemetry listener : udp://{host}:{udp_port}")
     print(f"[AERO-BRUSH] WebSocket bridge       : ws://{host}:{ws_port}")

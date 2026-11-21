@@ -21,6 +21,7 @@ import cv2
 import mediapipe as mp
 import numpy as np
 
+from backend.cameras import open_camera
 from backend.depth import PalmDepthEstimator
 from backend.filters import OneEuroFilter2D
 from backend.gesture_engine import GestureState, GestureStateMachine
@@ -276,15 +277,11 @@ def run_tracker(args: argparse.Namespace, stop_event: Optional[threading.Event] 
     cap = None
     detector = None
     if not args.simulate:
-        cap = cv2.VideoCapture(args.camera)
+        cap = open_camera(args.camera, args.width, args.height, args.hz)
         if not cap.isOpened():
             raise RuntimeError(
-                f"Could not open webcam index {args.camera}. "
-                "Try --camera <idx> or pass --simulate for synthetic telemetry."
+                f"Could not open camera index {args.camera}."
             )
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, args.width)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, args.height)
-        cap.set(cv2.CAP_PROP_FPS, args.hz)
         detector = MediaPipeHandDetector(model_path=Path(args.model))
 
     print(

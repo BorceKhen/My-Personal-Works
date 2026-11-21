@@ -25,6 +25,7 @@ hiddenimports = [
     "bridge",
     "tracker",
     "backend",
+    "backend.cameras",
     "backend.depth",
     "backend.filters",
     "backend.gesture_engine",

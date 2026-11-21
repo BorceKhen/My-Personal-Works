@@ -16,7 +16,7 @@ A modular real-time hand-gesture painting studio combining a Python computer-vis
   - **2D Canvas**: High-DPI anti-aliased quadratic spline renderer with neon outer glow, wide eraser, undo, and `.PNG` export.
   - **3D Space**: Three.js viewport with reference grid, dynamic $Z$-depth plane, continuous `TubeGeometry` strokes, fist-orbit controls, 3D eraser, and `.OBJ` / `.GLTF` export.
   - **Air-Hover Dock & PiP Hand Monitor**: `48x48px+` controls with `0.8s` radial dwell selection, plus a bottom-right 21-keypoint skeleton monitor.
-  - **Standalone Fallbacks**: Built-in Mouse Simulator and Browser Webcam MediaPipe JS mode (`@mediapipe/tasks-vision`) when no Python stream is active.
+  - **Camera Selection**: Automatically enumerates available system cameras and allows live switching from the studio header.
 
 ## Quick Start
 
@@ -37,15 +37,6 @@ A modular real-time hand-gesture painting studio combining a Python computer-vis
    python tracker.py --preview
    ```
    *(No webcam handy? Run `python tracker.py --simulate --preview`, or use the studio's built-in Mouse Simulator / Browser Cam selector.)*
-
-## Mouse Simulator Controls (Standalone Mode)
-- **Move mouse:** `HOVER` (hover any dock/mode button for `0.8s` to dwell-select)
-- **Left Click + Drag:** `DRAW`
-- **Hold `P` or `Alt` + Wheel:** `PINCH_SCALE` (resize brush `2px–30px`)
-- **Hold `E`:** `ERASE`
-- **Right Click + Drag:** `ORBIT_3D`
-- **Hold `Shift` + Wheel:** Adjust simulated $Z$-depth (`-1.0` to `+1.0`)
-- **`Ctrl+Z`:** Undo
 
 ## Running Tests
 ```bash

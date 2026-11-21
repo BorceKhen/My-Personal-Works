@@ -209,22 +209,20 @@ window.addEventListener('resize', () => {
 });
 
 // ---------- Telemetry Handling ----------
-function updateConnectionUI({ udpConnected, source }) {
+function updateConnectionUI({ udpConnected, source, cameraLabel = '' }) {
   state.udpConnected = udpConnected;
   udpStatusEl.classList.remove('is-live', 'is-sim', 'is-disconnected');
 
-  if (udpConnected) {
+  const labelText = cameraLabel ? cameraLabel.toUpperCase() : 'CAMERA';
+  if (udpConnected || source === 'browser-cam') {
     udpStatusEl.classList.add('is-live');
-    udpStatusTextEl.textContent = 'UDP :5055 — CAMERA LIVE';
-  } else if (source === 'webcam') {
-    udpStatusEl.classList.add('is-live');
-    udpStatusTextEl.textContent = 'BROWSER CAM — CV LIVE';
-  } else if (source === 'simulator') {
-    udpStatusEl.classList.add('is-sim');
-    udpStatusTextEl.textContent = 'MOUSE SIMULATOR';
+    udpStatusTextEl.textContent = `${labelText} — LIVE`;
+  } else if (source === 'none') {
+    udpStatusEl.classList.add('is-disconnected');
+    udpStatusTextEl.textContent = 'NO CAMERA FOUND';
   } else {
     udpStatusEl.classList.add('is-disconnected');
-    udpStatusTextEl.textContent = 'UDP :5055 — WAITING FOR TRACKER';
+    udpStatusTextEl.textContent = `${labelText} — CONNECTING…`;
   }
 }
 
@@ -335,14 +333,51 @@ const inputManager = new InputSourceManager({
   onConnectionChange: updateConnectionUI,
 });
 
-sourceSelectEl.addEventListener('change', (e) => {
-  state.inputSource = e.target.value;
-  inputManager.setMode(state.inputSource);
-  updateConnectionUI({ udpConnected: state.udpConnected, source: state.inputSource });
+async function initAvailableCameras() {
+  const { cameras, activeValue, backend } = await inputManager.listAvailableCameras();
+  sourceSelectEl.innerHTML = '';
+
+  if (!cameras.length) {
+    const emptyOpt = document.createElement('option');
+    emptyOpt.value = '';
+    emptyOpt.textContent = 'No Camera Found';
+    emptyOpt.disabled = true;
+    emptyOpt.selected = true;
+    sourceSelectEl.appendChild(emptyOpt);
+    updateConnectionUI({ udpConnected: false, source: 'none' });
+    return;
+  }
+
+  for (const cam of cameras) {
+    const opt = document.createElement('option');
+    opt.value = cam.value;
+    opt.textContent = cam.label;
+    sourceSelectEl.appendChild(opt);
+  }
+
+  const chosen = cameras.find((c) => c.value === activeValue) || cameras[0];
+  sourceSelectEl.value = chosen.value;
+  state.inputSource = chosen.value;
+  inputManager.activeCameraLabel = chosen.label;
+
+  if (backend === 'browser') {
+    await inputManager.selectCamera(chosen.value, chosen.label);
+  } else {
+    updateConnectionUI({ udpConnected: state.udpConnected, source: 'python', cameraLabel: chosen.label });
+  }
+}
+
+sourceSelectEl.addEventListener('change', async (e) => {
+  const select = e.target;
+  const selectedOpt = select.options[select.selectedIndex];
+  const label = selectedOpt ? selectedOpt.textContent : '';
+  state.inputSource = select.value;
+  updateConnectionUI({ udpConnected: false, source: 'python', cameraLabel: label });
+  await inputManager.selectCamera(select.value, label);
 });
 
 inputManager.start();
-updateConnectionUI({ udpConnected: false, source: state.inputSource });
+initAvailableCameras();
 
 function renderLoop() {
   if (state.mode === '3d') {

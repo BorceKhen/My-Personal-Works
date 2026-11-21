@@ -69,18 +69,16 @@
             <span id="telem-fps" class="telem-value">60</span>
           </div>
           <div class="telem-divider"></div>
-          <div id="udp-status" class="udp-status is-disconnected" title="UDP :5055 / WebSocket :8765 Status">
+          <div id="udp-status" class="udp-status is-disconnected" title="Camera Telemetry Status">
             <span class="status-led"></span>
-            <span id="udp-status-text">UDP :5055 — STANDBY</span>
+            <span id="udp-status-text">CAMERA — CONNECTING…</span>
           </div>
         </div>
 
-        <div class="source-switcher" title="Input Source">
-          <label class="sr-only" for="input-source-select">Input Source</label>
+        <div class="source-switcher" title="Available Cameras">
+          <label class="sr-only" for="input-source-select">Available Cameras</label>
           <select id="input-source-select" class="source-select">
-            <option value="auto">Auto (UDP :5055)</option>
-            <option value="webcam">Browser Cam (JS)</option>
-            <option value="simulator">Mouse Simulator</option>
+            <option value="" disabled selected>Detecting cameras…</option>
           </select>
         </div>
       </div>

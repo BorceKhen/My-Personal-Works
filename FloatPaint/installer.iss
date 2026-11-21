@@ -48,7 +48,6 @@ Source: "assets\icon.ico"; DestDir: "{app}\assets"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\assets\icon.ico"
-Name: "{autoprograms}\{#MyAppName} (Demo Simulator)"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--simulate"; IconFilename: "{app}\assets\icon.ico"
 Name: "{autoprograms}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\assets\icon.ico"; Tasks: desktopicon
 

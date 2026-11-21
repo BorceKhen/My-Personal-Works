@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import copy
 import os
 import socket
 import sys
@@ -11,6 +12,7 @@ import threading
 import time
 import webbrowser
 from pathlib import Path
+from typing import Dict, List, Optional
 
 if sys.stdout is None:
     sys.stdout = open(os.devnull, "w", encoding="utf-8")
@@ -21,6 +23,7 @@ import webview
 
 import bridge
 import tracker
+from backend.cameras import list_available_cameras
 
 ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 
@@ -92,33 +95,92 @@ class StudioApi:
         return True
 
 
-def _start_bridge_thread(udp_port: int = 5055, ws_port: int = 8765, http_port: int = 8080) -> threading.Thread:
+class CameraController:
+    """Manages available camera enumeration and switching the tracker thread."""
+
+    def __init__(self, base_args) -> None:
+        self._base_args = copy.copy(base_args)
+        self._lock = threading.Lock()
+        self._cameras: List[Dict[str, object]] = list_available_cameras()
+        self._stop_event: Optional[threading.Event] = None
+        self._thread: Optional[threading.Thread] = None
+        self.active_index: Optional[int] = None
+
+        if self._cameras:
+            available_ids = [int(cam["index"]) for cam in self._cameras]
+            if self._base_args.camera in available_ids:
+                self.active_index = self._base_args.camera
+            else:
+                self.active_index = available_ids[0]
+        elif self._base_args.simulate:
+            self.active_index = self._base_args.camera
+
+    def list_cameras(self) -> List[Dict[str, object]]:
+        with self._lock:
+            if self._cameras:
+                return list(self._cameras)
+            self._cameras = list_available_cameras()
+            return list(self._cameras)
+
+    def start_initial(self) -> None:
+        with self._lock:
+            if self.active_index is None and not self._base_args.simulate:
+                return
+            self._launch_locked(self.active_index if self.active_index is not None else 0)
+
+    def select_camera(self, index: int) -> bool:
+        with self._lock:
+            if self._cameras and index not in [int(c["index"]) for c in self._cameras]:
+                return False
+            self._stop_locked()
+            self.active_index = index
+            self._launch_locked(index)
+            return True
+
+    def stop(self) -> None:
+        with self._lock:
+            self._stop_locked()
+
+    def _stop_locked(self) -> None:
+        if self._stop_event is not None:
+            self._stop_event.set()
+        if self._thread is not None and self._thread.is_alive():
+            self._thread.join(timeout=2.5)
+        self._stop_event = None
+        self._thread = None
+
+    def _launch_locked(self, cam_index: int) -> None:
+        args = copy.copy(self._base_args)
+        args.camera = cam_index
+        stop_ev = threading.Event()
+        self._stop_event = stop_ev
+
+        def _runner() -> None:
+            try:
+                tracker.run_tracker(args, stop_event=stop_ev)
+            except RuntimeError as exc:
+                print(f"[AERO-BRUSH] Camera notice: {exc}")
+            except Exception as exc:
+                print(f"[AERO-BRUSH] Tracker stopped: {exc}")
+
+        thread = threading.Thread(target=_runner, name=f"AeroBrushTracker-{cam_index}", daemon=True)
+        thread.start()
+        self._thread = thread
+
+
+def _start_bridge_thread(
+    udp_port: int,
+    ws_port: int,
+    http_port: int,
+    camera_api: CameraController,
+) -> threading.Thread:
     def _runner() -> None:
         try:
-            asyncio.run(bridge.run_bridge("127.0.0.1", udp_port, ws_port, http_port))
+            asyncio.run(bridge.run_bridge("127.0.0.1", udp_port, ws_port, http_port, camera_api=camera_api))
         except Exception as exc:
             print(f"[AERO-BRUSH] Bridge error: {exc}")
 
     thread = threading.Thread(target=_runner, name="AeroBrushBridge", daemon=True)
-    thread.start()
-    return thread
-
-
-def _start_tracker_thread(
-    tracker_args,
-    stop_event: threading.Event,
-) -> threading.Thread:
-    def _runner() -> None:
-        try:
-            tracker.run_tracker(tracker_args, stop_event=stop_event)
-        except RuntimeError as exc:
-            # Keep the desktop studio open in Mouse Simulator / Browser Cam mode
-            # when no hardware webcam is connected.
-            print(f"[AERO-BRUSH] Camera notice: {exc}")
-        except Exception as exc:
-            print(f"[AERO-BRUSH] Tracker stopped: {exc}")
-
-    thread = threading.Thread(target=_runner, name="AeroBrushTracker", daemon=True)
     thread.start()
     return thread
 
@@ -134,25 +196,26 @@ def main() -> None:
     ws_port = _pick_tcp_port(8765)
     http_port = _pick_tcp_port(8080)
 
-    _start_bridge_thread(udp_port=udp_port, ws_port=ws_port, http_port=http_port)
-    _wait_for_port("127.0.0.1", http_port, timeout_s=4.0)
-
-    stop_event = threading.Event()
     tracker_args = tracker.parse_args(raw_args)
     if "--port" not in raw_args:
         tracker_args.port = udp_port
 
+    camera_ctrl = CameraController(tracker_args)
+
+    _start_bridge_thread(udp_port=udp_port, ws_port=ws_port, http_port=http_port, camera_api=camera_ctrl)
+    _wait_for_port("127.0.0.1", http_port, timeout_s=4.0)
+
+    camera_ctrl.start_initial()
     studio_url = f"http://127.0.0.1:{http_port}/?ws={ws_port}"
 
     if use_browser:
         webbrowser.open(studio_url)
         try:
-            tracker.run_tracker(tracker_args, stop_event=stop_event)
+            while True:
+                time.sleep(0.5)
         except KeyboardInterrupt:
-            pass
+            camera_ctrl.stop()
         return
-
-    tracker_thread = _start_tracker_thread(tracker_args, stop_event)
 
     api = StudioApi()
     window = webview.create_window(
@@ -165,16 +228,11 @@ def main() -> None:
         background_color="#0B0E14",
     )
 
-    def _on_closing() -> None:
-        stop_event.set()
-
-    window.events.closing += _on_closing
+    window.events.closing += lambda: camera_ctrl.stop()
 
     icon_path = ROOT / "assets" / "icon.ico"
     webview.start(icon=str(icon_path) if icon_path.exists() else None)
-
-    stop_event.set()
-    tracker_thread.join(timeout=2.0)
+    camera_ctrl.stop()
 
 
 if __name__ == "__main__":

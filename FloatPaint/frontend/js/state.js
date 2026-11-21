@@ -36,7 +36,7 @@ export function createStudioState() {
     brushRadius: 10, // 2..30 px
     zLockEnabled: false,
     zLockPlane: 0.0, // -1.0 .. +1.0
-    inputSource: 'auto', // 'auto' | 'webcam' | 'simulator'
+    inputSource: '', // active camera identifier
     udpConnected: false,
     udpLastPacketMs: 0,
     telemetry: {
@@ -45,7 +45,7 @@ export function createStudioState() {
       pinch_dist: 0.12,
       landmarks: [],
       fps: 60,
-      source: 'simulator',
+      source: 'camera',
     },
   };
 }
