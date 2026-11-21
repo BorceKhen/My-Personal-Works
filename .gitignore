@@ -1,6 +1,8 @@
 # Built application files
 *.apk
-!SpeakDo/SpeakDo.apk
+!Image Compressor/ImageCompressor.apk
+!Overlay Customization/OverlayController_Setup.exe
+!Overlay Customization/OverlayController.exe
 *.aar
 *.ap_
 *.aab
@@ -86,3 +88,6 @@ env/
 
 # Editor
 .vscode/
+
+# Work-in-progress projects (kept locally, not tracked)
+SpeakDo/
