@@ -20,28 +20,32 @@ data class ForgeColors(
     val primaryInk: Color,
     val secondaryInk: Color,
     val accentCobalt: Color,
-    // Classic Library Ambience Tokens (leather spines, brass foil, emerald cloth, oak)
+    // Classic Library Ambience Tokens (leather spines, brass foil, emerald cloth, oak, navy)
     val bookSpineOxblood: Color,
     val bookSpineEmerald: Color,
+    val bookSpineNavy: Color,
     val brassFoilGold: Color,
     val warmWalnut: Color,
+    val walnutDark: Color,
     val libraryShelfTint: Color
 )
 
 private val ArchivalPaperColors = ForgeColors(
     isDark = false,
-    background = Color(0xFFFBFBFA),
+    background = Color(0xFFFBF9F5),
     surface = Color(0xFFFFFFFF),
-    border = Color(0xFFE4E4E7),
-    calloutTint = Color(0xFFF4F4F5),
+    border = Color(0xFFE3DDD3),
+    calloutTint = Color(0xFFF4F0E8),
     primaryInk = Color(0xFF18181B),
     secondaryInk = Color(0xFF52525B),
     accentCobalt = Color(0xFF2563EB),
-    bookSpineOxblood = Color(0xFF7A2832),
-    bookSpineEmerald = Color(0xFF1E4D3B),
-    brassFoilGold = Color(0xFFB5892E),
-    warmWalnut = Color(0xFF5C3D2E),
-    libraryShelfTint = Color(0xFFF6F2EA)
+    bookSpineOxblood = Color(0xFF74222D),
+    bookSpineEmerald = Color(0xFF1B4737),
+    bookSpineNavy = Color(0xFF223857),
+    brassFoilGold = Color(0xFFC59B38),
+    warmWalnut = Color(0xFF63402C),
+    walnutDark = Color(0xFF3E2619),
+    libraryShelfTint = Color(0xFFF3ECE0)
 )
 
 private val MidnightBlueprintColors = ForgeColors(
@@ -53,11 +57,13 @@ private val MidnightBlueprintColors = ForgeColors(
     primaryInk = Color(0xFFF4F4F5),
     secondaryInk = Color(0xFFA1A1AA),
     accentCobalt = Color(0xFF60A5FA),
-    bookSpineOxblood = Color(0xFFB84A57),
-    bookSpineEmerald = Color(0xFF3A8769),
+    bookSpineOxblood = Color(0xFF8C2D3A),
+    bookSpineEmerald = Color(0xFF225945),
+    bookSpineNavy = Color(0xFF2B466D),
     brassFoilGold = Color(0xFFD9B25F),
-    warmWalnut = Color(0xFF8C6450),
-    libraryShelfTint = Color(0xFF1B1917)
+    warmWalnut = Color(0xFF543625),
+    walnutDark = Color(0xFF332015),
+    libraryShelfTint = Color(0xFF191716)
 )
 
 val LocalForgeColors = staticCompositionLocalOf { ArchivalPaperColors }

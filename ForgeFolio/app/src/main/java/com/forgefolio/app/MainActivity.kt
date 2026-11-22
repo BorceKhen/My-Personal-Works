@@ -5,6 +5,9 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -144,11 +147,17 @@ fun ForgeFolioAppScreen(
                 }
             )
 
-            when (state.selectedTab) {
-                ForgeTab.PDF_TO_IMG -> PdfToImageScreen(state = state, viewModel = viewModel)
-                ForgeTab.IMG_TO_PDF -> ImageToPdfScreen(state = state, viewModel = viewModel)
-                ForgeTab.DOCX_TO_PDF -> WordToPdfScreen(state = state, viewModel = viewModel)
-                ForgeTab.PDF_TO_DOCX -> PdfToWordScreen(state = state, viewModel = viewModel)
+            Crossfade(
+                targetState = state.selectedTab,
+                animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+                label = "folioTabCrossfade"
+            ) { activeTab ->
+                when (activeTab) {
+                    ForgeTab.PDF_TO_IMG -> PdfToImageScreen(state = state, viewModel = viewModel)
+                    ForgeTab.IMG_TO_PDF -> ImageToPdfScreen(state = state, viewModel = viewModel)
+                    ForgeTab.DOCX_TO_PDF -> WordToPdfScreen(state = state, viewModel = viewModel)
+                    ForgeTab.PDF_TO_DOCX -> PdfToWordScreen(state = state, viewModel = viewModel)
+                }
             }
 
             ConversionStatusPanel(

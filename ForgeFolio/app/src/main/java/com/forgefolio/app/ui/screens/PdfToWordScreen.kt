@@ -56,7 +56,7 @@ fun PdfToWordScreen(
             sectionNumber = "01",
             title = "Source PDF Volume",
             subtitle = "Choose a PDF and inspect pages before converting to Word (.docx).",
-            spineColor = colors.accentCobalt
+            spineColor = colors.bookSpineNavy
         ) {
             OutlinedButton(
                 onClick = { pickPdfLauncher.launch(arrayOf("application/pdf")) },
@@ -89,7 +89,7 @@ fun PdfToWordScreen(
             sectionNumber = "02",
             title = "Page Range & Conversion Mode",
             subtitle = "Switch between live PDFBox text extraction or pixel-faithful page plates.",
-            spineColor = colors.accentCobalt
+            spineColor = colors.bookSpineNavy
         ) {
             Text("PAGE RANGE", style = ForgeTextStyles.monoBadge, color = colors.secondaryInk)
             Spacer(modifier = Modifier.height(6.dp))
