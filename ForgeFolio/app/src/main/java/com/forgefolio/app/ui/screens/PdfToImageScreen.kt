@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -27,6 +28,7 @@ import com.forgefolio.app.model.PdfDpiPreset
 import com.forgefolio.app.model.PdfToImageOutputMode
 import com.forgefolio.app.ui.ConverterUiState
 import com.forgefolio.app.ui.ConverterViewModel
+import com.forgefolio.app.ui.components.BookcaseShelfPlank
 import com.forgefolio.app.ui.components.DocCalloutBanner
 import com.forgefolio.app.ui.components.DocQualitySlider
 import com.forgefolio.app.ui.components.DocSectionCard
@@ -214,10 +216,14 @@ fun PdfToImageScreen(
         }
 
         if (state.pdfToImgDoc == null) {
-            DocCalloutBanner(
-                title = "ARCHIVAL NOTE • WHITE CANVAS RENDER",
-                body = "Transparent PDF pages are automatically composited onto pure white (#FFFFFF) so JPG and PNG exports remain crisp."
-            )
+            Column(modifier = Modifier.fillMaxWidth()) {
+                DocCalloutBanner(
+                    title = "ARCHIVAL NOTE • WHITE CANVAS RENDER",
+                    body = "Transparent PDF pages are automatically composited onto pure white (#FFFFFF) so JPG and PNG exports remain crisp.",
+                    modifier = Modifier.padding(horizontal = 10.dp)
+                )
+                BookcaseShelfPlank(shelfLabel = "CURATOR'S NOTE")
+            }
         }
     }
 }

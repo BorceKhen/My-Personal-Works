@@ -35,6 +35,7 @@ import com.forgefolio.app.model.ForgeTab
 import com.forgefolio.app.ui.ConverterViewModel
 import com.forgefolio.app.ui.components.ConversionStatusPanel
 import com.forgefolio.app.ui.components.ForgeFolioHeader
+import com.forgefolio.app.ui.components.LibraryBookcaseBody
 import com.forgefolio.app.ui.components.LibraryBookshelfBar
 import com.forgefolio.app.ui.components.RecentShelfStrip
 import com.forgefolio.app.ui.screens.ImageToPdfScreen
@@ -129,46 +130,52 @@ fun ForgeFolioAppScreen(
             onSelectTab = viewModel::selectTab
         )
 
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+        LibraryBookcaseBody(
+            isDarkTheme = isDarkTheme,
+            modifier = Modifier.weight(1f)
         ) {
-            RecentShelfStrip(
-                entries = state.shelfHistory,
-                onEntryClick = { entry ->
-                    if (entry.isExportedOutput) {
-                        openUri(entry.uri, entry.title, entry.mimeType, entry.isFolderTree)
-                    } else {
-                        viewModel.selectTab(entry.sourceTab)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(top = 12.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                RecentShelfStrip(
+                    entries = state.shelfHistory,
+                    onEntryClick = { entry ->
+                        if (entry.isExportedOutput) {
+                            openUri(entry.uri, entry.title, entry.mimeType, entry.isFolderTree)
+                        } else {
+                            viewModel.selectTab(entry.sourceTab)
+                        }
+                    }
+                )
+
+                Crossfade(
+                    targetState = state.selectedTab,
+                    animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+                    label = "folioTabCrossfade"
+                ) { activeTab ->
+                    when (activeTab) {
+                        ForgeTab.PDF_TO_IMG -> PdfToImageScreen(state = state, viewModel = viewModel)
+                        ForgeTab.IMG_TO_PDF -> ImageToPdfScreen(state = state, viewModel = viewModel)
+                        ForgeTab.DOCX_TO_PDF -> WordToPdfScreen(state = state, viewModel = viewModel)
+                        ForgeTab.PDF_TO_DOCX -> PdfToWordScreen(state = state, viewModel = viewModel)
                     }
                 }
-            )
 
-            Crossfade(
-                targetState = state.selectedTab,
-                animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
-                label = "folioTabCrossfade"
-            ) { activeTab ->
-                when (activeTab) {
-                    ForgeTab.PDF_TO_IMG -> PdfToImageScreen(state = state, viewModel = viewModel)
-                    ForgeTab.IMG_TO_PDF -> ImageToPdfScreen(state = state, viewModel = viewModel)
-                    ForgeTab.DOCX_TO_PDF -> WordToPdfScreen(state = state, viewModel = viewModel)
-                    ForgeTab.PDF_TO_DOCX -> PdfToWordScreen(state = state, viewModel = viewModel)
-                }
+                ConversionStatusPanel(
+                    progress = state.progress,
+                    result = state.result,
+                    errorMessage = state.errorMessage,
+                    onOpenResult = ::openResult,
+                    onShareResult = ::shareResult,
+                    modifier = Modifier.padding(horizontal = 10.dp)
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
             }
-
-            ConversionStatusPanel(
-                progress = state.progress,
-                result = state.result,
-                errorMessage = state.errorMessage,
-                onOpenResult = ::openResult,
-                onShareResult = ::shareResult
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }

@@ -39,6 +39,7 @@ import com.forgefolio.app.model.PageRangeParser
 import com.forgefolio.app.model.PaperSizePreset
 import com.forgefolio.app.ui.ConverterUiState
 import com.forgefolio.app.ui.ConverterViewModel
+import com.forgefolio.app.ui.components.BookcaseShelfPlank
 import com.forgefolio.app.ui.components.DocCalloutBanner
 import com.forgefolio.app.ui.components.DocSectionCard
 import com.forgefolio.app.ui.components.DocSelectableChip
@@ -218,10 +219,14 @@ fun ImageToPdfScreen(
         }
 
         if (state.selectedImages.isEmpty()) {
-            DocCalloutBanner(
-                title = "EXIF & MEMORY GUARD",
-                body = "Photos are auto-rotated using ExifInterface and decoded via two-pass inSampleSize sampling to prevent OutOfMemory errors."
-            )
+            Column(modifier = Modifier.fillMaxWidth()) {
+                DocCalloutBanner(
+                    title = "EXIF & MEMORY GUARD",
+                    body = "Photos are auto-rotated using ExifInterface and decoded via two-pass inSampleSize sampling to prevent OutOfMemory errors.",
+                    modifier = Modifier.padding(horizontal = 10.dp)
+                )
+                BookcaseShelfPlank(shelfLabel = "CURATOR'S NOTE")
+            }
         }
     }
 }

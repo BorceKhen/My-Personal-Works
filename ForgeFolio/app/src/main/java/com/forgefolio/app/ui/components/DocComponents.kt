@@ -51,10 +51,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -73,8 +78,9 @@ import com.forgefolio.app.ui.theme.LocalForgeColors
 private val SmoothEase = tween<Float>(durationMillis = 240, easing = FastOutSlowInEasing)
 
 /**
- * Editorial Library Header displaying FORGEFOLIO, [ OFFLINE • LOCAL ENGINE ],
- * leather spine stack, and Light/Dark study mode switch.
+ * Editorial Library Header displaying FORGEFOLIO, [ OFFLINE • ARCHIVAL LIBRARY ],
+ * leather spine stack, and an interactive Brass Candlestick toggle:
+ * Light Mode = Lit Candle (warm candlelight), Dark Mode = Candle Extinguished.
  */
 @Composable
 fun ForgeFolioHeader(
@@ -83,11 +89,42 @@ fun ForgeFolioHeader(
     modifier: Modifier = Modifier
 ) {
     val colors = LocalForgeColors.current
+    val candleLit = !isDarkTheme
+    val flameAlpha by animateFloatAsState(
+        targetValue = if (candleLit) 1f else 0f,
+        animationSpec = tween(durationMillis = 360, easing = FastOutSlowInEasing),
+        label = "headerCandleFlame"
+    )
+    val interactionSource = remember { MutableInteractionSource() }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(colors.surface)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        colors.surface,
+                        colors.libraryShelfTint
+                    )
+                )
+            )
+            .drawBehind {
+                if (flameAlpha > 0.01f) {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                colors.candleGlow.copy(alpha = 0.28f * flameAlpha),
+                                Color.Transparent
+                            ),
+                            center = Offset(size.width * 0.84f, size.height * 0.5f),
+                            radius = size.width * 0.36f
+                        ),
+                        center = Offset(size.width * 0.84f, size.height * 0.5f),
+                        radius = size.width * 0.36f
+                    )
+                }
+            }
+            .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -113,7 +150,7 @@ fun ForgeFolioHeader(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))
-                        .background(colors.libraryShelfTint)
+                        .background(colors.surface.copy(alpha = 0.75f))
                         .border(1.dp, colors.border, RoundedCornerShape(4.dp))
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
@@ -126,18 +163,360 @@ fun ForgeFolioHeader(
             }
         }
 
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(7.dp))
+                .background(colors.surface.copy(alpha = 0.9f))
+                .border(
+                    width = 1.dp,
+                    color = colors.brassFoilGold.copy(alpha = if (candleLit) 0.78f else 0.42f),
+                    shape = RoundedCornerShape(7.dp)
+                )
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onToggleTheme
+                )
+                .padding(horizontal = 9.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            LibraryBrassCandle(
+                litFraction = flameAlpha,
+                brassColor = colors.brassFoilGold,
+                darkInk = colors.walnutDark
+            )
+            Column {
+                Text(
+                    text = if (candleLit) "CANDLE LIT" else "CANDLE OFF",
+                    style = ForgeTextStyles.monoBadge.copy(fontSize = 10.sp),
+                    fontWeight = FontWeight.Bold,
+                    color = colors.primaryInk
+                )
+                Text(
+                    text = if (candleLit) "Tap to dim" else "Tap to light",
+                    style = ForgeTextStyles.monoBadge.copy(fontSize = 9.sp, lineHeight = 10.sp),
+                    color = colors.secondaryInk
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Custom Canvas brass taper candlestick: glows with a golden teardrop flame in Light Mode
+ * and rests extinguished with a delicate silver smoke curl in Dark Mode.
+ */
+@Composable
+private fun LibraryBrassCandle(
+    litFraction: Float,
+    brassColor: Color,
+    darkInk: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier.size(width = 20.dp, height = 28.dp)) {
+        val w = size.width
+        val h = size.height
+        val cx = w * 0.48f
+
+        // Warm candlelight aura behind flame
+        if (litFraction > 0.02f) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFFFFCA62).copy(alpha = 0.65f * litFraction),
+                        Color(0xFFFF9F1C).copy(alpha = 0.2f * litFraction),
+                        Color.Transparent
+                    ),
+                    center = Offset(cx, h * 0.24f),
+                    radius = w * 0.62f
+                ),
+                center = Offset(cx, h * 0.24f),
+                radius = w * 0.62f
+            )
+        }
+
+        // Brass saucer & ring handle
+        drawRoundRect(
+            color = brassColor,
+            topLeft = Offset(w * 0.12f, h * 0.84f),
+            size = Size(w * 0.72f, h * 0.11f)
+        )
+        drawCircle(
+            color = brassColor,
+            radius = w * 0.12f,
+            center = Offset(w * 0.84f, h * 0.85f),
+            style = Stroke(width = 1.6.dp.toPx())
+        )
+
+        // Brass collar cup
+        drawRoundRect(
+            color = brassColor.copy(alpha = 0.9f),
+            topLeft = Offset(cx - w * 0.18f, h * 0.76f),
+            size = Size(w * 0.36f, h * 0.09f)
+        )
+
+        // Cream beeswax candle shaft
+        val waxTop = h * 0.42f
+        val waxW = w * 0.24f
+        drawRoundRect(
+            brush = Brush.horizontalGradient(
+                colors = listOf(
+                    Color(0xFFE7DEC8),
+                    Color(0xFFFDF8EA),
+                    Color(0xFFD5C8AD)
+                ),
+                startX = cx - waxW / 2f,
+                endX = cx + waxW / 2f
+            ),
+            topLeft = Offset(cx - waxW / 2f, waxTop),
+            size = Size(waxW, h * 0.77f - waxTop)
+        )
+
+        // Charred wick
+        drawLine(
+            color = darkInk,
+            start = Offset(cx, waxTop),
+            end = Offset(cx, h * 0.33f),
+            strokeWidth = 1.4.dp.toPx(),
+            cap = StrokeCap.Round
+        )
+
+        // Flame (Light Mode) vs Smoke Curl (Dark Mode)
+        if (litFraction > 0.05f) {
+            val flamePath = Path().apply {
+                moveTo(cx, h * 0.08f)
+                quadraticTo(cx + w * 0.18f, h * 0.24f, cx, h * 0.35f)
+                quadraticTo(cx - w * 0.18f, h * 0.24f, cx, h * 0.08f)
+                close()
+            }
+            drawPath(
+                path = flamePath,
+                color = Color(0xFFFF9F1C).copy(alpha = litFraction)
+            )
+            val corePath = Path().apply {
+                moveTo(cx, h * 0.16f)
+                quadraticTo(cx + w * 0.08f, h * 0.26f, cx, h * 0.34f)
+                quadraticTo(cx - w * 0.08f, h * 0.26f, cx, h * 0.16f)
+                close()
+            }
+            drawPath(
+                path = corePath,
+                color = Color(0xFFFFF8D6).copy(alpha = litFraction)
+            )
+        }
+
+        val smokeAlpha = (1f - litFraction).coerceIn(0f, 1f)
+        if (smokeAlpha > 0.05f) {
+            val smokePath = Path().apply {
+                moveTo(cx, h * 0.31f)
+                cubicTo(
+                    cx - w * 0.12f, h * 0.23f,
+                    cx + w * 0.14f, h * 0.15f,
+                    cx - w * 0.03f, h * 0.06f
+                )
+            }
+            drawPath(
+                path = smokePath,
+                color = Color(0xFFA8A095).copy(alpha = 0.55f * smokeAlpha),
+                style = Stroke(width = 1.1.dp.toPx(), cap = StrokeCap.Round)
+            )
+        }
+    }
+}
+
+/**
+ * Architectural Library Bookcase Bay enclosing the scrollable body:
+ * renders textured wainscot alcove backdrop, warm candlelight glow in Light Mode,
+ * and tall left/right carved walnut bookcase stiles framing every shelf below.
+ */
+@Composable
+fun LibraryBookcaseBody(
+    isDarkTheme: Boolean,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    val colors = LocalForgeColors.current
+    val candleGlowFraction by animateFloatAsState(
+        targetValue = if (!isDarkTheme) 1f else 0f,
+        animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing),
+        label = "alcoveCandleGlow"
+    )
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .drawBehind {
+                // Warm antique parchment alcove (Light) or deep mahogany study bay (Dark)
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(colors.alcoveWallTop, colors.alcoveWallBottom)
+                    )
+                )
+
+                // Subtle vertical wainscot wood-panel grooves behind shelves
+                val stileW = 10.dp.toPx()
+                val innerW = (size.width - stileW * 2f).coerceAtLeast(1f)
+                for (i in 1..3) {
+                    val x = stileW + innerW * (i / 4f)
+                    drawLine(
+                        color = colors.walnutDark.copy(alpha = if (isDarkTheme) 0.35f else 0.09f),
+                        start = Offset(x, 0f),
+                        end = Offset(x, size.height),
+                        strokeWidth = 1.dp.toPx()
+                    )
+                }
+
+                // Warm radial candlelight aura cascading down from the top-right candle sconce
+                if (candleGlowFraction > 0.01f) {
+                    drawRect(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                colors.candleGlow.copy(alpha = 0.24f * candleGlowFraction),
+                                colors.candleGlow.copy(alpha = 0.08f * candleGlowFraction),
+                                Color.Transparent
+                            ),
+                            center = Offset(size.width * 0.85f, size.height * 0.04f),
+                            radius = size.width * 0.95f
+                        )
+                    )
+                }
+
+                // Left carved walnut bookcase stile + inner alcove shadow
+                drawRect(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(colors.walnutDark, colors.warmWalnut, colors.walnutDark),
+                        startX = 0f,
+                        endX = stileW
+                    ),
+                    topLeft = Offset.Zero,
+                    size = Size(stileW, size.height)
+                )
+                drawLine(
+                    color = colors.brassFoilGold.copy(alpha = 0.35f),
+                    start = Offset(stileW - 1.dp.toPx(), 0f),
+                    end = Offset(stileW - 1.dp.toPx(), size.height),
+                    strokeWidth = 1.dp.toPx()
+                )
+                drawRect(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(colors.walnutDark.copy(alpha = 0.28f), Color.Transparent),
+                        startX = stileW,
+                        endX = stileW + 10.dp.toPx()
+                    ),
+                    topLeft = Offset(stileW, 0f),
+                    size = Size(10.dp.toPx(), size.height)
+                )
+
+                // Right carved walnut bookcase stile + inner alcove shadow
+                val rightX = size.width - stileW
+                drawRect(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(colors.walnutDark, colors.warmWalnut, colors.walnutDark),
+                        startX = rightX,
+                        endX = size.width
+                    ),
+                    topLeft = Offset(rightX, 0f),
+                    size = Size(stileW, size.height)
+                )
+                drawLine(
+                    color = colors.brassFoilGold.copy(alpha = 0.35f),
+                    start = Offset(rightX + 1.dp.toPx(), 0f),
+                    end = Offset(rightX + 1.dp.toPx(), size.height),
+                    strokeWidth = 1.dp.toPx()
+                )
+                drawRect(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(Color.Transparent, colors.walnutDark.copy(alpha = 0.28f)),
+                        startX = rightX - 10.dp.toPx(),
+                        endX = rightX
+                    ),
+                    topLeft = Offset(rightX - 10.dp.toPx(), 0f),
+                    size = Size(10.dp.toPx(), size.height)
+                )
+            }
+            .padding(horizontal = 10.dp)
+    ) {
+        content()
+    }
+}
+
+/**
+ * Wall-to-wall carved wooden shelf plank spanning smoothly between the left and right
+ * bookcase pillars, with brass edge trim, corner brackets, and a centered catalog plaque.
+ */
+@Composable
+fun BookcaseShelfPlank(
+    shelfLabel: String? = null,
+    modifier: Modifier = Modifier
+) {
+    val colors = LocalForgeColors.current
+    Column(modifier = modifier.fillMaxWidth()) {
+        // Carved oak/walnut shelf board
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(colors.libraryShelfTint)
-                .border(1.dp, colors.brassFoilGold.copy(alpha = 0.45f), RoundedCornerShape(6.dp))
-                .clickable(onClick = onToggleTheme)
-                .padding(horizontal = 10.dp, vertical = 7.dp)
+                .fillMaxWidth()
+                .height(12.dp)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            colors.warmWalnut,
+                            colors.walnutDark
+                        )
+                    )
+                ),
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = if (isDarkTheme) "ARCHIVAL LIGHT" else "MIDNIGHT STUDY",
-                style = ForgeTextStyles.monoBadge,
-                color = colors.primaryInk
+            if (!shelfLabel.isNullOrBlank()) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(colors.brassFoilGold.copy(alpha = 0.9f))
+                        .padding(horizontal = 8.dp, vertical = 0.5.dp)
+                ) {
+                    Text(
+                        text = shelfLabel,
+                        style = ForgeTextStyles.monoBadge.copy(fontSize = 8.sp, lineHeight = 10.sp),
+                        fontWeight = FontWeight.Bold,
+                        color = colors.walnutDark,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+        // Brass shelf front lip
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.5.dp)
+                .background(colors.brassFoilGold.copy(alpha = 0.65f))
+        )
+        // Corner brass shelf brackets & under-shelf cast shadow
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(5.dp)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            colors.walnutDark.copy(alpha = 0.28f),
+                            Color.Transparent
+                        )
+                    )
+                )
+                .padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(width = 14.dp, height = 4.dp)
+                    .background(colors.brassFoilGold.copy(alpha = 0.5f))
+            )
+            Box(
+                modifier = Modifier
+                    .size(width = 14.dp, height = 4.dp)
+                    .background(colors.brassFoilGold.copy(alpha = 0.5f))
             )
         }
     }
@@ -411,101 +790,99 @@ fun RecentShelfStrip(
     val colors = LocalForgeColors.current
     if (entries.isEmpty()) return
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(colors.libraryShelfTint)
-            .border(1.dp, colors.border, RoundedCornerShape(8.dp))
-    ) {
-        Row(
+    Column(modifier = modifier.fillMaxWidth()) {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(horizontal = 10.dp)
+                .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+                .background(colors.libraryShelfTint.copy(alpha = 0.92f))
+                .border(1.dp, colors.border, RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
         ) {
-            Text(
-                text = "READING DESK SHELF",
-                style = ForgeTextStyles.monoBadge,
-                fontWeight = FontWeight.Bold,
-                color = colors.brassFoilGold
-            )
-            Text(
-                text = "${entries.size} FOLIO(S)",
-                style = ForgeTextStyles.monoBadge,
-                color = colors.secondaryInk
-            )
-        }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "READING DESK SHELF",
+                    style = ForgeTextStyles.monoBadge,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.brassFoilGold
+                )
+                Text(
+                    text = "${entries.size} FOLIO(S)",
+                    style = ForgeTextStyles.monoBadge,
+                    color = colors.secondaryInk
+                )
+            }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            entries.forEach { item ->
-                val spineColor = if (item.isExportedOutput) {
-                    colors.bookSpineEmerald
-                } else {
-                    colors.bookSpineOxblood
-                }
-                Row(
-                    modifier = Modifier
-                        .width(174.dp)
-                        .height(IntrinsicSize.Min)
-                        .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
-                        .background(colors.surface)
-                        .border(1.dp, colors.border, RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
-                        .clickable { onEntryClick(item) }
-                ) {
-                    Box(
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                entries.forEach { item ->
+                    val spineColor = if (item.isExportedOutput) {
+                        colors.bookSpineEmerald
+                    } else {
+                        colors.bookSpineOxblood
+                    }
+                    Row(
                         modifier = Modifier
-                            .width(6.dp)
-                            .fillMaxHeight()
-                            .background(spineColor)
-                    )
-                    Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp)) {
-                        Text(
-                            text = if (item.isExportedOutput) "EXPORTED • ${item.badge}" else "OPENED • ${item.badge}",
-                            style = ForgeTextStyles.monoBadge.copy(fontSize = 10.sp),
-                            color = spineColor,
-                            maxLines = 1
+                            .width(174.dp)
+                            .height(IntrinsicSize.Min)
+                            .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                            .background(colors.surface)
+                            .border(1.dp, colors.border, RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                            .clickable { onEntryClick(item) }
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(6.dp)
+                                .fillMaxHeight()
+                                .background(spineColor)
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = item.title,
-                            style = ForgeTextStyles.monoMeta.copy(fontSize = 11.sp),
-                            fontWeight = FontWeight.SemiBold,
-                            color = colors.primaryInk,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = item.meta,
-                            style = ForgeTextStyles.monoBadge.copy(fontSize = 10.sp),
-                            color = colors.secondaryInk,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp)) {
+                            Text(
+                                text = if (item.isExportedOutput) "EXPORTED • ${item.badge}" else "OPENED • ${item.badge}",
+                                style = ForgeTextStyles.monoBadge.copy(fontSize = 10.sp),
+                                color = spineColor,
+                                maxLines = 1
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = item.title,
+                                style = ForgeTextStyles.monoMeta.copy(fontSize = 11.sp),
+                                fontWeight = FontWeight.SemiBold,
+                                color = colors.primaryInk,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = item.meta,
+                                style = ForgeTextStyles.monoBadge.copy(fontSize = 10.sp),
+                                color = colors.secondaryInk,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
             }
         }
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(7.dp)
-                .background(Brush.verticalGradient(listOf(colors.warmWalnut, colors.walnutDark)))
-        )
+        BookcaseShelfPlank(shelfLabel = "READING DESK • ${entries.size} FOLIO(S)")
     }
 }
 
 /**
- * Smooth collapsible archival book-folio section card with bound leather spine,
- * gold-foil notches, and gentle fade reveal (no vertical bounce jitter).
+ * Smooth collapsible archival book-folio section card resting directly inside a wooden
+ * bookcase bay plank, complete with flanking brass bookends and bound leather spine.
  */
 @Composable
 fun DocSectionCard(
@@ -522,114 +899,142 @@ fun DocSectionCard(
     var expanded by rememberSaveable(sectionNumber, title) { mutableStateOf(initiallyExpanded) }
     val interactionSource = remember { MutableInteractionSource() }
 
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = colors.surface,
-        border = BorderStroke(1.dp, colors.border),
-        shadowElevation = 0.dp
-    ) {
+    Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(IntrinsicSize.Min)
+                .padding(horizontal = 3.dp),
+            verticalAlignment = Alignment.Bottom
         ) {
-            // Left bound leather spine with twin gold-foil ribs
-            Column(
+            // Left resting bookcase bookend resting on the shelf edge
+            Box(
                 modifier = Modifier
-                    .width(7.dp)
-                    .fillMaxHeight()
-                    .background(effectiveSpine),
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                Box(
-                    modifier = Modifier
-                        .padding(top = 12.dp)
-                        .fillMaxWidth()
-                        .height(2.dp)
-                        .background(colors.brassFoilGold)
-                )
-                Box(
-                    modifier = Modifier
-                        .padding(bottom = 12.dp)
-                        .fillMaxWidth()
-                        .height(2.dp)
-                        .background(colors.brassFoilGold)
-                )
-            }
+                    .padding(end = 3.dp)
+                    .size(width = 4.dp, height = 28.dp)
+                    .clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
+                    .background(effectiveSpine.copy(alpha = 0.72f))
+            )
 
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(15.dp)
+            Surface(
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 2.dp, bottomEnd = 2.dp),
+                color = colors.surface,
+                border = BorderStroke(1.dp, colors.border),
+                shadowElevation = 0.dp
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(
-                            interactionSource = interactionSource,
-                            indication = null,
-                            onClick = { expanded = !expanded }
-                        ),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .height(IntrinsicSize.Min)
                 ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    // Left bound leather spine with twin gold-foil ribs
+                    Column(
+                        modifier = Modifier
+                            .width(7.dp)
+                            .fillMaxHeight()
+                            .background(effectiveSpine),
+                        verticalArrangement = Arrangement.SpaceBetween
                     ) {
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(colors.libraryShelfTint)
-                                .border(1.dp, colors.border, RoundedCornerShape(4.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = "VOL.$sectionNumber",
-                                style = ForgeTextStyles.monoBadge,
-                                color = effectiveSpine
-                            )
-                        }
-                        Text(
-                            text = title,
-                            style = ForgeTextStyles.sectionHeading,
-                            color = colors.primaryInk,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                                .padding(top = 12.dp)
+                                .fillMaxWidth()
+                                .height(2.dp)
+                                .background(colors.brassFoilGold)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .padding(bottom = 12.dp)
+                                .fillMaxWidth()
+                                .height(2.dp)
+                                .background(colors.brassFoilGold)
                         )
                     }
 
-                    // Hanging mini bookmark chevron
-                    Text(
-                        text = if (expanded) "▾" else "▸",
-                        style = ForgeTextStyles.monoMeta,
-                        color = colors.brassFoilGold
-                    )
-                }
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(14.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(
+                                    interactionSource = interactionSource,
+                                    indication = null,
+                                    onClick = { expanded = !expanded }
+                                ),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(colors.libraryShelfTint)
+                                        .border(1.dp, colors.border, RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "VOL.$sectionNumber",
+                                        style = ForgeTextStyles.monoBadge,
+                                        color = effectiveSpine
+                                    )
+                                }
+                                Text(
+                                    text = title,
+                                    style = ForgeTextStyles.sectionHeading,
+                                    color = colors.primaryInk,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
 
-                if (!subtitle.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = subtitle,
-                        style = ForgeTextStyles.monoMeta,
-                        color = colors.secondaryInk
-                    )
-                }
+                            Text(
+                                text = if (expanded) "▾" else "▸",
+                                style = ForgeTextStyles.monoMeta,
+                                color = colors.brassFoilGold
+                            )
+                        }
 
-                AnimatedVisibility(
-                    visible = expanded,
-                    enter = fadeIn(tween(180, easing = FastOutSlowInEasing)),
-                    exit = fadeOut(tween(140, easing = FastOutSlowInEasing))
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        content()
+                        if (!subtitle.isNullOrBlank()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = subtitle,
+                                style = ForgeTextStyles.monoMeta,
+                                color = colors.secondaryInk
+                            )
+                        }
+
+                        AnimatedVisibility(
+                            visible = expanded,
+                            enter = fadeIn(tween(180, easing = FastOutSlowInEasing)),
+                            exit = fadeOut(tween(140, easing = FastOutSlowInEasing))
+                        ) {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Spacer(modifier = Modifier.height(12.dp))
+                                content()
+                            }
+                        }
                     }
                 }
             }
+
+            // Right resting bookcase bookend
+            Box(
+                modifier = Modifier
+                    .padding(start = 3.dp)
+                    .size(width = 4.dp, height = 24.dp)
+                    .clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
+                    .background(colors.walnutDark.copy(alpha = 0.72f))
+            )
         }
+
+        BookcaseShelfPlank(shelfLabel = "BAY $sectionNumber • ${title.uppercase()}")
     }
 }
 
