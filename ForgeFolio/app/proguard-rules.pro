@@ -1,0 +1,7 @@
+-keep class org.apache.poi.** { *; }
+-keep class org.apache.xmlbeans.** { *; }
+-keep class com.tom_roush.pdfbox.** { *; }
+-dontwarn org.apache.poi.**
+-dontwarn org.apache.xmlbeans.**
+-dontwarn java.awt.**
+-dontwarn javax.imageio.**

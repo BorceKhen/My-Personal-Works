@@ -28,3 +28,9 @@ A 100% offline/local-network multi-device screen streaming and remote control sy
 - **Tech Stack**: Kotlin, WebRTC (`webrtc-sdk`), Ktor CIO WebSockets, NsdManager, AccessibilityService, Python, `aiortc`, PyQt6, `SendInput`, Inno Setup
 - **Download**: [DeckCast.apk](./DeckCast/DeckCast.apk) (Android) | [DeckCast_Setup.exe](./DeckCast/DeckCast_Setup.exe) (Windows Installer)
 
+### 📚 [ForgeFolio](./ForgeFolio)
+A 100% offline 4-way Android document converter (**PDF → Image**, **Image → PDF**, **Word `.docx` → PDF**, and **PDF → Word `.docx`**) styled with an archival library & editorial documentation theme.
+- **Platform**: Android
+- **Tech Stack**: Kotlin, Jetpack Compose, Material 3, `pdfbox-android`, Apache POI (`poi-ooxml`), `PdfRenderer`, `ExifInterface`, Storage Access Framework
+- **Download APK**: [ForgeFolio.apk](./ForgeFolio/ForgeFolio.apk)
+

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Oxblood leather folio cover -->
+    <path
+        android:fillColor="#7A2832"
+        android:pathData="M28,22 L76,22 C79.3,22 82,24.7 82,28 L82,80 C82,83.3 79.3,86 76,86 L28,86 C26.3,86 25,84.7 25,83 L25,25 C25,23.3 26.3,22 28,22 Z" />
+    <!-- Spine -->
+    <path
+        android:fillColor="#4E161E"
+        android:pathData="M25,22 L35,22 L35,86 L25,86 Z" />
+    <!-- Archival paper pages edge -->
+    <path
+        android:fillColor="#FBFBFA"
+        android:pathData="M37,26 L77,26 L77,82 L37,82 Z" />
+    <!-- Brass gold-leaf embossed frame & bookmark -->
+    <path
+        android:fillColor="#C9A24D"
+        android:pathData="M43,34 L71,34 L71,36 L43,36 Z M43,42 L67,42 L67,44 L43,44 Z M43,50 L62,50 L62,52 L43,52 Z" />
+    <path
+        android:fillColor="#1E4D3B"
+        android:pathData="M61,26 L69,26 L69,62 L65,57 L61,62 Z" />
+</vector>
