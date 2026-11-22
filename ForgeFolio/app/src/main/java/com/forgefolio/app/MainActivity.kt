@@ -8,36 +8,22 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ScrollableTabRow
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRowDefaults
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -46,12 +32,13 @@ import com.forgefolio.app.model.ForgeTab
 import com.forgefolio.app.ui.ConverterViewModel
 import com.forgefolio.app.ui.components.ConversionStatusPanel
 import com.forgefolio.app.ui.components.ForgeFolioHeader
+import com.forgefolio.app.ui.components.LibraryBookshelfBar
+import com.forgefolio.app.ui.components.RecentShelfStrip
 import com.forgefolio.app.ui.screens.ImageToPdfScreen
 import com.forgefolio.app.ui.screens.PdfToImageScreen
 import com.forgefolio.app.ui.screens.PdfToWordScreen
 import com.forgefolio.app.ui.screens.WordToPdfScreen
 import com.forgefolio.app.ui.theme.ForgeFolioTheme
-import com.forgefolio.app.ui.theme.ForgeTextStyles
 import com.forgefolio.app.ui.theme.LocalForgeColors
 
 class MainActivity : ComponentActivity() {
@@ -81,21 +68,24 @@ fun ForgeFolioAppScreen(
     val colors = LocalForgeColors.current
     val context = LocalContext.current
 
-    fun openResult(res: ConversionResult) {
+    fun openUri(uri: android.net.Uri, displayName: String, mimeType: String, isFolderTree: Boolean) {
         val intent = Intent(Intent.ACTION_VIEW).apply {
-            if (res.isFolderTree) {
-                setDataAndType(res.uri, "vnd.android.document/directory")
+            if (isFolderTree) {
+                setDataAndType(uri, "vnd.android.document/directory")
             } else {
-                setDataAndType(res.uri, res.mimeType)
+                setDataAndType(uri, mimeType)
             }
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         runCatching {
-            context.startActivity(Intent.createChooser(intent, "Open ${res.displayName}"))
+            context.startActivity(Intent.createChooser(intent, "Open $displayName"))
         }.onFailure {
-            Toast.makeText(context, "No viewer app found for ${res.displayName}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "No viewer app found for $displayName", Toast.LENGTH_SHORT).show()
         }
     }
+
+    fun openResult(res: ConversionResult) =
+        openUri(res.uri, res.displayName, res.mimeType, res.isFolderTree)
 
     fun shareResult(res: ConversionResult) {
         val intent = Intent(Intent.ACTION_SEND).apply {
@@ -110,6 +100,13 @@ fun ForgeFolioAppScreen(
         }
     }
 
+    val loadedBadges = mapOf(
+        ForgeTab.PDF_TO_IMG to state.pdfToImgDoc?.displayName,
+        ForgeTab.IMG_TO_PDF to if (state.selectedImages.isNotEmpty()) "${state.selectedImages.size}" else null,
+        ForgeTab.DOCX_TO_PDF to state.docxToPdfInfo?.displayName,
+        ForgeTab.PDF_TO_DOCX to state.pdfToDocxInfo?.displayName
+    )
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -123,52 +120,11 @@ fun ForgeFolioAppScreen(
 
         HorizontalDivider(thickness = 1.dp, color = colors.border)
 
-        ScrollableTabRow(
-            selectedTabIndex = state.selectedTab.index,
-            containerColor = colors.surface,
-            contentColor = colors.primaryInk,
-            edgePadding = 12.dp,
-            divider = { HorizontalDivider(thickness = 1.dp, color = colors.border) },
-            indicator = { tabPositions ->
-                val pos = tabPositions[state.selectedTab.index]
-                TabRowDefaults.SecondaryIndicator(
-                    modifier = Modifier.tabIndicatorOffset(pos),
-                    height = 2.dp,
-                    color = colors.accentCobalt
-                )
-            }
-        ) {
-            ForgeTab.entries.forEach { tab ->
-                val selected = state.selectedTab == tab
-                val spineDot = when (tab) {
-                    ForgeTab.PDF_TO_IMG -> colors.bookSpineOxblood
-                    ForgeTab.IMG_TO_PDF -> colors.bookSpineEmerald
-                    ForgeTab.DOCX_TO_PDF -> colors.brassFoilGold
-                    ForgeTab.PDF_TO_DOCX -> colors.accentCobalt
-                }
-                Tab(
-                    selected = selected,
-                    onClick = { viewModel.selectTab(tab) },
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(spineDot)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = tab.label,
-                                style = ForgeTextStyles.monoBadge,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (selected) colors.accentCobalt else colors.secondaryInk
-                            )
-                        }
-                    }
-                )
-            }
-        }
+        LibraryBookshelfBar(
+            selectedTab = state.selectedTab,
+            loadedBadges = loadedBadges,
+            onSelectTab = viewModel::selectTab
+        )
 
         Column(
             modifier = Modifier
@@ -177,6 +133,17 @@ fun ForgeFolioAppScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            RecentShelfStrip(
+                entries = state.shelfHistory,
+                onEntryClick = { entry ->
+                    if (entry.isExportedOutput) {
+                        openUri(entry.uri, entry.title, entry.mimeType, entry.isFolderTree)
+                    } else {
+                        viewModel.selectTab(entry.sourceTab)
+                    }
+                }
+            )
+
             when (state.selectedTab) {
                 ForgeTab.PDF_TO_IMG -> PdfToImageScreen(state = state, viewModel = viewModel)
                 ForgeTab.IMG_TO_PDF -> ImageToPdfScreen(state = state, viewModel = viewModel)

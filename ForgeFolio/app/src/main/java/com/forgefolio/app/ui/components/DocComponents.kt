@@ -1,9 +1,19 @@
 package com.forgefolio.app.ui.components
 
+import android.graphics.Bitmap
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,34 +22,54 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.forgefolio.app.model.ConversionProgress
 import com.forgefolio.app.model.ConversionResult
+import com.forgefolio.app.model.ForgeTab
+import com.forgefolio.app.model.ShelfArchiveEntry
 import com.forgefolio.app.ui.theme.ForgeTextStyles
 import com.forgefolio.app.ui.theme.LocalForgeColors
 
 /**
  * Editorial Library Header displaying FORGEFOLIO, [ OFFLINE • LOCAL ENGINE ],
- * book-spine folio color strips, and a Light/Dark reading-room theme switch.
+ * book-spine emblem, and Light/Dark reading-room theme switch.
  */
 @Composable
 fun ForgeFolioHeader(
@@ -52,7 +82,7 @@ fun ForgeFolioHeader(
         modifier = modifier
             .fillMaxWidth()
             .background(colors.surface)
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .padding(horizontal = 16.dp, vertical = 10.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -60,16 +90,15 @@ fun ForgeFolioHeader(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Classic leather & brass book-spine emblem inspired by archival library volumes
                 Row(
                     modifier = Modifier
-                        .height(26.dp)
+                        .height(28.dp)
                         .clip(RoundedCornerShape(4.dp))
                         .border(1.dp, colors.border, RoundedCornerShape(4.dp))
                 ) {
                     Box(modifier = Modifier.width(5.dp).fillMaxHeight().background(colors.bookSpineOxblood))
-                    Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(colors.bookSpineEmerald))
-                    Box(modifier = Modifier.width(3.dp).fillMaxHeight().background(colors.brassFoilGold))
+                    Box(modifier = Modifier.width(5.dp).fillMaxHeight().background(colors.bookSpineEmerald))
+                    Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(colors.brassFoilGold))
                 }
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
@@ -78,82 +107,6 @@ fun ForgeFolioHeader(
                         style = ForgeTextStyles.folioDisplay,
                         color = colors.primaryInk
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(colors.libraryShelfTint)
-                                .border(1.dp, colors.border, RoundedCornerShape(4.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = "[ OFFLINE • LOCAL ENGINE ]",
-                                style = ForgeTextStyles.monoBadge,
-                                color = colors.brassFoilGold
-                            )
-                        }
-                    }
-                }
-            }
-
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(colors.calloutTint)
-                    .border(1.dp, colors.border, RoundedCornerShape(6.dp))
-                    .clickable(onClick = onToggleTheme)
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
-            ) {
-                Text(
-                    text = if (isDarkTheme) "ARCHIVAL LIGHT" else "MIDNIGHT STUDY",
-                    style = ForgeTextStyles.monoBadge,
-                    color = colors.secondaryInk
-                )
-            }
-        }
-    }
-}
-
-/**
- * Numbered documentation section block with 1.dp hairline border, library spine strip,
- * and clean flat layered surface.
- */
-@Composable
-fun DocSectionCard(
-    sectionNumber: String,
-    title: String,
-    subtitle: String? = null,
-    spineColor: Color? = null,
-    modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    val colors = LocalForgeColors.current
-    val effectiveSpine = spineColor ?: colors.brassFoilGold
-
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = colors.surface,
-        border = BorderStroke(1.dp, colors.border),
-        shadowElevation = 0.dp
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            // Subtle gilded/leather volume accent bar along top edge
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(2.dp)
-                    .background(effectiveSpine.copy(alpha = 0.65f))
-            )
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
@@ -162,17 +115,399 @@ fun DocSectionCard(
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            text = "VOL.$sectionNumber",
+                            text = "[ OFFLINE • LOCAL ENGINE ]",
                             style = ForgeTextStyles.monoBadge,
-                            color = effectiveSpine
+                            color = colors.brassFoilGold
                         )
                     }
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(colors.libraryShelfTint)
+                    .border(1.dp, colors.border, RoundedCornerShape(6.dp))
+                    .clickable(onClick = onToggleTheme)
+                    .padding(horizontal = 10.dp, vertical = 7.dp)
+            ) {
+                Text(
+                    text = if (isDarkTheme) "ARCHIVAL LIGHT" else "MIDNIGHT STUDY",
+                    style = ForgeTextStyles.monoBadge,
+                    color = colors.primaryInk
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Interactive oak/walnut library bookshelf where the 4 conversion volumes sit as
+ * leather-bound spines with twin gold-foil bands. Selecting a book pulls it out
+ * of the shelf with a smooth elevation & hanging bookmark ribbon.
+ */
+@Composable
+fun LibraryBookshelfBar(
+    selectedTab: ForgeTab,
+    loadedBadges: Map<ForgeTab, String?>,
+    onSelectTab: (ForgeTab) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = LocalForgeColors.current
+    val woodPlankBrush = Brush.verticalGradient(
+        colors = listOf(colors.warmWalnut, colors.warmWalnut.copy(alpha = 0.85f))
+    )
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(colors.libraryShelfTint)
+            .padding(top = 10.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Bottom
+        ) {
+            // Decorative bookend on left
+            Box(
+                modifier = Modifier
+                    .width(8.dp)
+                    .height(52.dp)
+                    .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
+                    .background(colors.warmWalnut.copy(alpha = 0.65f))
+                    .border(1.dp, colors.border, RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
+            )
+
+            ForgeTab.entries.forEach { tab ->
+                val isSelected = selectedTab == tab
+                val spineBase = when (tab) {
+                    ForgeTab.PDF_TO_IMG -> colors.bookSpineOxblood
+                    ForgeTab.IMG_TO_PDF -> colors.bookSpineEmerald
+                    ForgeTab.DOCX_TO_PDF -> colors.warmWalnut
+                    ForgeTab.PDF_TO_DOCX -> colors.accentCobalt
+                }
+                val liftDp by animateDpAsState(
+                    targetValue = if (isSelected) (-6).dp else 0.dp,
+                    animationSpec = tween(durationMillis = 220),
+                    label = "bookLift"
+                )
+                val bookHeight by animateDpAsState(
+                    targetValue = if (isSelected) 70.dp else 62.dp,
+                    animationSpec = tween(durationMillis = 220),
+                    label = "bookHeight"
+                )
+                val shortLabel = when (tab) {
+                    ForgeTab.PDF_TO_IMG -> "PDF\n→IMG"
+                    ForgeTab.IMG_TO_PDF -> "IMG\n→PDF"
+                    ForgeTab.DOCX_TO_PDF -> "DOCX\n→PDF"
+                    ForgeTab.PDF_TO_DOCX -> "PDF\n→DOCX"
+                }
+                val loadedHint = loadedBadges[tab]
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .offset(y = liftDp)
+                        .height(bookHeight)
+                        .clip(RoundedCornerShape(topStart = 5.dp, topEnd = 5.dp, bottomStart = 2.dp, bottomEnd = 2.dp))
+                        .background(
+                            if (isSelected) spineBase else spineBase.copy(alpha = 0.80f)
+                        )
+                        .border(
+                            width = if (isSelected) 1.5.dp else 1.dp,
+                            color = if (isSelected) colors.brassFoilGold else colors.border,
+                            shape = RoundedCornerShape(topStart = 5.dp, topEnd = 5.dp, bottomStart = 2.dp, bottomEnd = 2.dp)
+                        )
+                        .clickable { onSelectTab(tab) }
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(vertical = 4.dp, horizontal = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        // Top gold-leaf foil spine rib
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(2.dp)
+                                .background(colors.brassFoilGold.copy(alpha = if (isSelected) 1f else 0.65f))
+                        )
+
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Text(
+                                    text = tab.code,
+                                    style = ForgeTextStyles.monoBadge.copy(fontSize = 10.sp),
+                                    fontWeight = FontWeight.Bold,
+                                    color = colors.brassFoilGold
+                                )
+                                if (!loadedHint.isNullOrBlank()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF2EF2A0))
+                                    )
+                                }
+                            }
+                            Text(
+                                text = shortLabel,
+                                style = ForgeTextStyles.monoBadge.copy(fontSize = 10.sp, lineHeight = 12.sp),
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = Color(0xFFFBFBFA),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+
+                        // Bottom gold-leaf foil spine rib
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(2.dp)
+                                .background(colors.brassFoilGold.copy(alpha = if (isSelected) 1f else 0.65f))
+                        )
+                    }
+                }
+            }
+
+            // Decorative bookend on right
+            Box(
+                modifier = Modifier
+                    .width(8.dp)
+                    .height(52.dp)
+                    .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
+                    .background(colors.warmWalnut.copy(alpha = 0.65f))
+                    .border(1.dp, colors.border, RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
+            )
+        }
+
+        // Oak / Walnut Bookshelf Plank + Brass Edge Trim
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .background(woodPlankBrush)
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(2.dp)
+                .background(colors.brassFoilGold.copy(alpha = 0.7f))
+        )
+    }
+}
+
+/**
+ * Interactive lower Reading Room Shelf displaying loaded & exported documents as
+ * tactile mini volumes sitting on a wooden ledge.
+ */
+@Composable
+fun RecentShelfStrip(
+    entries: List<ShelfArchiveEntry>,
+    onEntryClick: (ShelfArchiveEntry) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = LocalForgeColors.current
+    if (entries.isEmpty()) return
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(colors.libraryShelfTint)
+            .border(1.dp, colors.border, RoundedCornerShape(8.dp))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "READING DESK SHELF",
+                style = ForgeTextStyles.monoBadge,
+                fontWeight = FontWeight.Bold,
+                color = colors.brassFoilGold
+            )
+            Text(
+                text = "${entries.size} FOLIO(S)",
+                style = ForgeTextStyles.monoBadge,
+                color = colors.secondaryInk
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            entries.forEach { item ->
+                val spineColor = if (item.isExportedOutput) {
+                    colors.bookSpineEmerald
+                } else {
+                    colors.bookSpineOxblood
+                }
+                Row(
+                    modifier = Modifier
+                        .width(172.dp)
+                        .height(IntrinsicSize.Min)
+                        .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                        .background(colors.surface)
+                        .border(1.dp, colors.border, RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                        .clickable { onEntryClick(item) }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(5.dp)
+                            .fillMaxHeight()
+                            .background(spineColor)
+                    )
+                    Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp)) {
+                        Text(
+                            text = if (item.isExportedOutput) "EXPORTED • ${item.badge}" else "OPENED • ${item.badge}",
+                            style = ForgeTextStyles.monoBadge.copy(fontSize = 10.sp),
+                            color = spineColor,
+                            maxLines = 1
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = item.title,
+                            style = ForgeTextStyles.monoMeta.copy(fontSize = 11.sp),
+                            fontWeight = FontWeight.SemiBold,
+                            color = colors.primaryInk,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = item.meta,
+                            style = ForgeTextStyles.monoBadge.copy(fontSize = 10.sp),
+                            color = colors.secondaryInk,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+
+        // Mini shelf plank beneath recent folios
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .background(colors.warmWalnut)
+        )
+    }
+}
+
+/**
+ * Collapsible archival book-folio section card with a bound leather spine, gold-foil ribs,
+ * and crisp 1.dp hairline border.
+ */
+@Composable
+fun DocSectionCard(
+    sectionNumber: String,
+    title: String,
+    subtitle: String? = null,
+    spineColor: Color? = null,
+    initiallyExpanded: Boolean = true,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val colors = LocalForgeColors.current
+    val effectiveSpine = spineColor ?: colors.brassFoilGold
+    var expanded by rememberSaveable(sectionNumber, title) { mutableStateOf(initiallyExpanded) }
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = colors.surface,
+        border = BorderStroke(1.dp, colors.border),
+        shadowElevation = 0.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min)
+        ) {
+            // Left bound leather spine with twin gold-foil notches
+            Column(
+                modifier = Modifier
+                    .width(7.dp)
+                    .fillMaxHeight()
+                    .background(effectiveSpine),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(top = 12.dp)
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .background(colors.brassFoilGold)
+                )
+                Box(
+                    modifier = Modifier
+                        .padding(bottom = 12.dp)
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .background(colors.brassFoilGold)
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(15.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { expanded = !expanded },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(colors.libraryShelfTint)
+                                .border(1.dp, colors.border, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "VOL.$sectionNumber",
+                                style = ForgeTextStyles.monoBadge,
+                                color = effectiveSpine
+                            )
+                        }
+                        Text(
+                            text = title,
+                            style = ForgeTextStyles.sectionHeading,
+                            color = colors.primaryInk,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
                     Text(
-                        text = title,
-                        style = ForgeTextStyles.sectionHeading,
-                        color = colors.primaryInk,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        text = if (expanded) "▾" else "▸",
+                        style = ForgeTextStyles.monoMeta,
+                        color = colors.secondaryInk
                     )
                 }
 
@@ -185,10 +520,220 @@ fun DocSectionCard(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
-                content()
+                AnimatedVisibility(
+                    visible = expanded,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        content()
+                    }
+                }
             }
         }
+    }
+}
+
+/**
+ * Interactive PDF Folio Page Flipper + Tap-to-Zoom Lightbox Dialog.
+ */
+@Composable
+fun InteractiveFolioPreview(
+    bitmap: Bitmap?,
+    displayName: String,
+    sizeLabel: String,
+    currentPageZeroBased: Int,
+    totalPages: Int,
+    onPrevPage: () -> Unit,
+    onNextPage: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = LocalForgeColors.current
+    var showZoomDialog by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(colors.libraryShelfTint)
+            .border(1.dp, colors.border, RoundedCornerShape(6.dp))
+            .padding(10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = "Folio page preview",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .size(width = 84.dp, height = 112.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color.White)
+                        .border(1.dp, colors.brassFoilGold.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
+                        .clickable { showZoomDialog = true }
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Text(
+                    text = displayName,
+                    style = ForgeTextStyles.sectionHeading,
+                    color = colors.primaryInk,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = sizeLabel,
+                    style = ForgeTextStyles.monoMeta,
+                    color = colors.secondaryInk
+                )
+                Text(
+                    text = "PLATE ${String.format("%02d", currentPageZeroBased + 1)} / ${String.format("%02d", totalPages)} • TAP TO INSPECT",
+                    style = ForgeTextStyles.monoBadge,
+                    color = colors.accentCobalt
+                )
+
+                if (totalPages > 1) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        PageFlipBtn("◀ Prev", enabled = currentPageZeroBased > 0, onClick = onPrevPage)
+                        PageFlipBtn("Next ▶", enabled = currentPageZeroBased < totalPages - 1, onClick = onNextPage)
+                    }
+                }
+            }
+        }
+    }
+
+    if (showZoomDialog && bitmap != null) {
+        Dialog(onDismissRequest = { showZoomDialog = false }) {
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = colors.surface,
+                border = BorderStroke(1.dp, colors.brassFoilGold)
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "PLATE ${currentPageZeroBased + 1} / $totalPages",
+                            style = ForgeTextStyles.monoBadge,
+                            color = colors.brassFoilGold
+                        )
+                        Text(
+                            text = "CLOSE ✕",
+                            style = ForgeTextStyles.monoBadge,
+                            color = colors.bookSpineOxblood,
+                            modifier = Modifier
+                                .clickable { showZoomDialog = false }
+                                .padding(4.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = "Zoomed page",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(420.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color.White)
+                            .border(1.dp, colors.border, RoundedCornerShape(4.dp))
+                    )
+                    if (totalPages > 1) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            PageFlipBtn("◀ Prev Page", enabled = currentPageZeroBased > 0, onClick = onPrevPage)
+                            PageFlipBtn("Next Page ▶", enabled = currentPageZeroBased < totalPages - 1, onClick = onNextPage)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PageFlipBtn(label: String, enabled: Boolean, onClick: () -> Unit) {
+    val colors = LocalForgeColors.current
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(5.dp))
+            .background(if (enabled) colors.surface else colors.calloutTint)
+            .border(1.dp, if (enabled) colors.accentCobalt else colors.border, RoundedCornerShape(5.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 5.dp)
+    ) {
+        Text(
+            text = label,
+            style = ForgeTextStyles.monoBadge,
+            color = if (enabled) colors.accentCobalt else colors.secondaryInk
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DocQualitySlider(
+    quality: Int,
+    isLosslessPng: Boolean,
+    onQualityChanged: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = LocalForgeColors.current
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("COMPRESSION QUALITY", style = ForgeTextStyles.monoBadge, color = colors.secondaryInk)
+            Text(
+                text = if (isLosslessPng) "100% (LOSSLESS PNG)" else "$quality%",
+                style = ForgeTextStyles.monoMeta,
+                color = colors.accentCobalt
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Slider(
+            value = if (isLosslessPng) 100f else quality.toFloat(),
+            onValueChange = { if (!isLosslessPng) onQualityChanged(it.toInt()) },
+            enabled = !isLosslessPng,
+            valueRange = 10f..100f,
+            thumb = {
+                Box(
+                    modifier = Modifier
+                        .size(16.dp)
+                        .clip(CircleShape)
+                        .background(if (isLosslessPng) colors.border else colors.accentCobalt)
+                        .border(2.dp, colors.surface, CircleShape)
+                )
+            },
+            track = { sliderState ->
+                SliderDefaults.Track(
+                    sliderState = sliderState,
+                    modifier = Modifier.height(5.dp),
+                    colors = SliderDefaults.colors(
+                        activeTrackColor = colors.accentCobalt,
+                        inactiveTrackColor = colors.border
+                    )
+                )
+            }
+        )
     }
 }
 

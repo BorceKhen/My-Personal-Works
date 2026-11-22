@@ -3,16 +3,12 @@ package com.forgefolio.app.ui.screens
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -20,12 +16,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.forgefolio.app.model.PageRangeParser
 import com.forgefolio.app.model.PdfToWordMode
@@ -34,6 +26,7 @@ import com.forgefolio.app.ui.ConverterViewModel
 import com.forgefolio.app.ui.components.DocCalloutBanner
 import com.forgefolio.app.ui.components.DocSectionCard
 import com.forgefolio.app.ui.components.DocSelectableChip
+import com.forgefolio.app.ui.components.InteractiveFolioPreview
 import com.forgefolio.app.ui.theme.ForgeTextStyles
 import com.forgefolio.app.ui.theme.LocalForgeColors
 
@@ -62,7 +55,7 @@ fun PdfToWordScreen(
         DocSectionCard(
             sectionNumber = "01",
             title = "Source PDF Volume",
-            subtitle = "Choose a PDF to convert into an editable or exact-layout Word (.docx).",
+            subtitle = "Choose a PDF and inspect pages before converting to Word (.docx).",
             spineColor = colors.accentCobalt
         ) {
             OutlinedButton(
@@ -80,40 +73,15 @@ fun PdfToWordScreen(
 
             state.pdfToDocxInfo?.let { doc ->
                 Spacer(modifier = Modifier.height(12.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    doc.firstPageThumbnail?.let { thumb ->
-                        Image(
-                            bitmap = thumb.asImageBitmap(),
-                            contentDescription = "Page 1 thumbnail",
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier
-                                .size(width = 76.dp, height = 100.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .border(1.dp, colors.border, RoundedCornerShape(4.dp))
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                    }
-                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(
-                            text = doc.displayName,
-                            style = ForgeTextStyles.sectionHeading,
-                            color = colors.primaryInk
-                        )
-                        Text(
-                            text = "SIZE: ${PageRangeParser.formatBytes(doc.sizeBytes)}",
-                            style = ForgeTextStyles.monoMeta,
-                            color = colors.secondaryInk
-                        )
-                        Text(
-                            text = "PAGES: ${doc.pageCount}",
-                            style = ForgeTextStyles.monoMeta,
-                            color = colors.accentCobalt
-                        )
-                    }
-                }
+                InteractiveFolioPreview(
+                    bitmap = state.pdfToDocxPreviewBitmap ?: doc.firstPageThumbnail,
+                    displayName = doc.displayName,
+                    sizeLabel = "SIZE: ${PageRangeParser.formatBytes(doc.sizeBytes)} • ${doc.pageCount} PAGES",
+                    currentPageZeroBased = state.pdfToDocxPreviewPage,
+                    totalPages = doc.pageCount,
+                    onPrevPage = { viewModel.stepPdfToDocxPreview(-1) },
+                    onNextPage = { viewModel.stepPdfToDocxPreview(+1) }
+                )
             }
         }
 

@@ -14,13 +14,16 @@ import com.forgefolio.app.model.ImageOutputFormat
 import com.forgefolio.app.model.ImageScaleMode
 import com.forgefolio.app.model.MarginPreset
 import com.forgefolio.app.model.PageOrientation
+import com.forgefolio.app.model.PageRangeParser
 import com.forgefolio.app.model.PaperSizePreset
 import com.forgefolio.app.model.PdfDocumentInfo
 import com.forgefolio.app.model.PdfDpiPreset
 import com.forgefolio.app.model.PdfToImageOutputMode
 import com.forgefolio.app.model.PdfToWordMode
 import com.forgefolio.app.model.SelectedImageItem
+import com.forgefolio.app.model.ShelfArchiveEntry
 import kotlinx.coroutines.Dispatchers
+import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,6 +38,8 @@ data class ConverterUiState(
 
     // Tab 1: PDF -> IMG
     val pdfToImgDoc: PdfDocumentInfo? = null,
+    val pdfToImgPreviewPage: Int = 0,
+    val pdfToImgPreviewBitmap: android.graphics.Bitmap? = null,
     val pdfToImgAllPages: Boolean = true,
     val pdfToImgCustomRange: String = "1",
     val pdfToImgFormat: ImageOutputFormat = ImageOutputFormat.PNG,
@@ -55,10 +60,15 @@ data class ConverterUiState(
 
     // Tab 4: PDF -> DOCX
     val pdfToDocxInfo: PdfDocumentInfo? = null,
+    val pdfToDocxPreviewPage: Int = 0,
+    val pdfToDocxPreviewBitmap: android.graphics.Bitmap? = null,
     val pdfToDocxAllPages: Boolean = true,
     val pdfToDocxCustomRange: String = "1",
     val pdfToDocxMode: PdfToWordMode = PdfToWordMode.EDITABLE_TEXT,
-    val pdfToDocxExactDpi: Int = 150
+    val pdfToDocxExactDpi: Int = 150,
+
+    // Interactive Library Shelf History
+    val shelfHistory: List<ShelfArchiveEntry> = emptyList()
 )
 
 class ConverterViewModel(application: Application) : AndroidViewModel(application) {
@@ -78,10 +88,24 @@ class ConverterViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch(Dispatchers.IO) {
             runCatching { pdfRepo.inspectPdf(uri) }
                 .onSuccess { info ->
+                    val entry = ShelfArchiveEntry(
+                        id = "src-pdf-img-${info.uri}",
+                        title = info.displayName,
+                        meta = "${info.pageCount}p • ${PageRangeParser.formatBytes(info.sizeBytes)}",
+                        badge = "PDF",
+                        uri = info.uri,
+                        mimeType = "application/pdf",
+                        isFolderTree = false,
+                        sourceTab = ForgeTab.PDF_TO_IMG,
+                        isExportedOutput = false
+                    )
                     _uiState.update {
                         it.copy(
                             pdfToImgDoc = info,
+                            pdfToImgPreviewPage = 0,
+                            pdfToImgPreviewBitmap = info.firstPageThumbnail,
                             pdfToImgCustomRange = if (info.pageCount > 1) "1-${minOf(3, info.pageCount)}" else "1",
+                            shelfHistory = prependShelfEntry(it.shelfHistory, entry),
                             errorMessage = null,
                             result = null
                         )
@@ -90,6 +114,18 @@ class ConverterViewModel(application: Application) : AndroidViewModel(applicatio
                 .onFailure { err ->
                     _uiState.update { it.copy(errorMessage = err.message ?: "Failed to read PDF.") }
                 }
+        }
+    }
+
+    fun stepPdfToImgPreview(delta: Int) {
+        val doc = _uiState.value.pdfToImgDoc ?: return
+        val next = (_uiState.value.pdfToImgPreviewPage + delta).coerceIn(0, (doc.pageCount - 1).coerceAtLeast(0))
+        if (next == _uiState.value.pdfToImgPreviewPage) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val bmp = runCatching { pdfRepo.renderPreviewPage(doc.uri, next) }.getOrNull()
+            if (bmp != null) {
+                _uiState.update { it.copy(pdfToImgPreviewPage = next, pdfToImgPreviewBitmap = bmp) }
+            }
         }
     }
 
@@ -190,8 +226,24 @@ class ConverterViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch(Dispatchers.IO) {
             runCatching { wordRepo.inspectDocx(uri) }
                 .onSuccess { info ->
+                    val entry = ShelfArchiveEntry(
+                        id = "src-docx-${info.uri}",
+                        title = info.displayName,
+                        meta = "${info.paragraphCount}¶ • ${PageRangeParser.formatBytes(info.sizeBytes)}",
+                        badge = "DOCX",
+                        uri = info.uri,
+                        mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        isFolderTree = false,
+                        sourceTab = ForgeTab.DOCX_TO_PDF,
+                        isExportedOutput = false
+                    )
                     _uiState.update {
-                        it.copy(docxToPdfInfo = info, errorMessage = null, result = null)
+                        it.copy(
+                            docxToPdfInfo = info,
+                            shelfHistory = prependShelfEntry(it.shelfHistory, entry),
+                            errorMessage = null,
+                            result = null
+                        )
                     }
                 }
                 .onFailure { err ->
@@ -223,10 +275,24 @@ class ConverterViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch(Dispatchers.IO) {
             runCatching { pdfRepo.inspectPdf(uri) }
                 .onSuccess { info ->
+                    val entry = ShelfArchiveEntry(
+                        id = "src-pdf-docx-${info.uri}",
+                        title = info.displayName,
+                        meta = "${info.pageCount}p • ${PageRangeParser.formatBytes(info.sizeBytes)}",
+                        badge = "PDF",
+                        uri = info.uri,
+                        mimeType = "application/pdf",
+                        isFolderTree = false,
+                        sourceTab = ForgeTab.PDF_TO_DOCX,
+                        isExportedOutput = false
+                    )
                     _uiState.update {
                         it.copy(
                             pdfToDocxInfo = info,
+                            pdfToDocxPreviewPage = 0,
+                            pdfToDocxPreviewBitmap = info.firstPageThumbnail,
                             pdfToDocxCustomRange = if (info.pageCount > 1) "1-${minOf(3, info.pageCount)}" else "1",
+                            shelfHistory = prependShelfEntry(it.shelfHistory, entry),
                             errorMessage = null,
                             result = null
                         )
@@ -235,6 +301,18 @@ class ConverterViewModel(application: Application) : AndroidViewModel(applicatio
                 .onFailure { err ->
                     _uiState.update { it.copy(errorMessage = err.message ?: "Failed to read PDF.") }
                 }
+        }
+    }
+
+    fun stepPdfToDocxPreview(delta: Int) {
+        val doc = _uiState.value.pdfToDocxInfo ?: return
+        val next = (_uiState.value.pdfToDocxPreviewPage + delta).coerceIn(0, (doc.pageCount - 1).coerceAtLeast(0))
+        if (next == _uiState.value.pdfToDocxPreviewPage) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val bmp = runCatching { pdfRepo.renderPreviewPage(doc.uri, next) }.getOrNull()
+            if (bmp != null) {
+                _uiState.update { it.copy(pdfToDocxPreviewPage = next, pdfToDocxPreviewBitmap = bmp) }
+            }
         }
     }
 
@@ -268,6 +346,7 @@ class ConverterViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun launchConversion(block: suspend () -> ConversionResult) {
         if (_uiState.value.progress.isRunning) return
+        val activeTab = _uiState.value.selectedTab
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.update {
                 it.copy(
@@ -278,10 +357,22 @@ class ConverterViewModel(application: Application) : AndroidViewModel(applicatio
             }
             runCatching { block() }
                 .onSuccess { res ->
+                    val exportedEntry = ShelfArchiveEntry(
+                        id = UUID.randomUUID().toString(),
+                        title = res.displayName,
+                        meta = res.summary,
+                        badge = "EXPORT",
+                        uri = res.uri,
+                        mimeType = res.mimeType,
+                        isFolderTree = res.isFolderTree,
+                        sourceTab = activeTab,
+                        isExportedOutput = true
+                    )
                     _uiState.update {
                         it.copy(
                             progress = ConversionProgress(isRunning = false),
-                            result = res
+                            result = res,
+                            shelfHistory = prependShelfEntry(it.shelfHistory, exportedEntry)
                         )
                     }
                 }
@@ -294,5 +385,13 @@ class ConverterViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                 }
         }
+    }
+
+    private fun prependShelfEntry(
+        current: List<ShelfArchiveEntry>,
+        entry: ShelfArchiveEntry
+    ): List<ShelfArchiveEntry> {
+        val filtered = current.filterNot { it.id == entry.id }
+        return (listOf(entry) + filtered).take(8)
     }
 }

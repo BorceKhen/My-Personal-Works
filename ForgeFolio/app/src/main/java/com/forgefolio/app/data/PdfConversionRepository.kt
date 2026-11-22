@@ -61,6 +61,26 @@ class PdfConversionRepository(private val context: Context) {
         )
     }
 
+    fun renderPreviewPage(uri: Uri, pageIndex: Int, maxDim: Float = 960f): Bitmap? {
+        var result: Bitmap? = null
+        SafFileHelper.withSeekablePdfDescriptor(context, uri) { fd ->
+            PdfRenderer(fd).use { renderer ->
+                if (pageIndex in 0 until renderer.pageCount) {
+                    renderer.openPage(pageIndex).use { page ->
+                        val scale = min(maxDim / page.width, maxDim / page.height).coerceAtMost(2.5f)
+                        val w = (page.width * scale).roundToInt().coerceAtLeast(1)
+                        val h = (page.height * scale).roundToInt().coerceAtLeast(1)
+                        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                        Canvas(bmp).drawColor(Color.WHITE)
+                        page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                        result = bmp
+                    }
+                }
+            }
+        }
+        return result
+    }
+
     fun inspectSelectedImage(uri: Uri): SelectedImageItem {
         val (name, size) = SafFileHelper.queryFileMeta(context, uri, "image.jpg")
         val (w, h) = SafFileHelper.readImageBounds(context, uri)

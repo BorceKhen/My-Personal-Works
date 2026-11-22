@@ -120,6 +120,18 @@ data class ConversionResult(
     val summary: String
 )
 
+data class ShelfArchiveEntry(
+    val id: String,
+    val title: String,
+    val meta: String,
+    val badge: String,
+    val uri: Uri,
+    val mimeType: String,
+    val isFolderTree: Boolean,
+    val sourceTab: ForgeTab,
+    val isExportedOutput: Boolean
+)
+
 object PageRangeParser {
     /**
      * Parses a 1-based range string like "1-3, 5, 8-10" into a sorted, deduplicated
