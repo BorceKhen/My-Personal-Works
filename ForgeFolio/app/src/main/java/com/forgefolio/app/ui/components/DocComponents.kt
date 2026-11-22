@@ -354,7 +354,7 @@ fun LibraryBookcaseBody(
                     )
                 )
 
-                // Subtle vertical wainscot wood-panel grooves behind shelves
+                // Subtle vertical wainscot wood-panel grooves + recessed library crown arch behind shelves
                 val stileW = 10.dp.toPx()
                 val innerW = (size.width - stileW * 2f).coerceAtLeast(1f)
                 for (i in 1..3) {
@@ -367,7 +367,67 @@ fun LibraryBookcaseBody(
                     )
                 }
 
-                // Warm radial candlelight aura cascading down from the top-right candle sconce
+                // Soft arched wooden alcove molding on the rear backplate
+                val archPath = Path().apply {
+                    moveTo(stileW + 6.dp.toPx(), 120.dp.toPx())
+                    quadraticTo(size.width * 0.5f, -18.dp.toPx(), size.width - stileW - 6.dp.toPx(), 120.dp.toPx())
+                }
+                drawPath(
+                    path = archPath,
+                    color = colors.warmWalnut.copy(alpha = if (isDarkTheme) 0.25f else 0.14f),
+                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+                )
+
+                // Recessed rear-wall brass sconce candles behind the shelves (subtle atmospheric silhouette)
+                val sconcePositions = listOf(
+                    Offset(size.width * 0.5f, 44.dp.toPx()),
+                    Offset(size.width * 0.5f, size.height * 0.54f)
+                )
+                sconcePositions.forEach { sconceCenter ->
+                    if (candleGlowFraction > 0.01f) {
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    colors.candleGlow.copy(alpha = 0.28f * candleGlowFraction),
+                                    colors.candleGlow.copy(alpha = 0.11f * candleGlowFraction),
+                                    Color.Transparent
+                                ),
+                                center = sconceCenter,
+                                radius = size.width * 0.62f
+                            ),
+                            center = sconceCenter,
+                            radius = size.width * 0.62f
+                        )
+                    }
+
+                    // Soft sconce bracket & unlit/lit beeswax pillar behind the vellum bays
+                    val sx = sconceCenter.x
+                    val sy = sconceCenter.y
+                    drawRoundRect(
+                        color = colors.brassFoilGold.copy(alpha = if (isDarkTheme) 0.14f else 0.18f),
+                        topLeft = Offset(sx - 10.dp.toPx(), sy + 14.dp.toPx()),
+                        size = Size(20.dp.toPx(), 4.dp.toPx())
+                    )
+                    drawRoundRect(
+                        color = Color(0xFFF6ECD5).copy(alpha = if (isDarkTheme) 0.11f else 0.26f),
+                        topLeft = Offset(sx - 5.dp.toPx(), sy - 10.dp.toPx()),
+                        size = Size(10.dp.toPx(), 24.dp.toPx())
+                    )
+                    if (candleGlowFraction > 0.05f) {
+                        val backFlame = Path().apply {
+                            moveTo(sx, sy - 26.dp.toPx())
+                            quadraticTo(sx + 7.dp.toPx(), sy - 15.dp.toPx(), sx, sy - 10.dp.toPx())
+                            quadraticTo(sx - 7.dp.toPx(), sy - 15.dp.toPx(), sx, sy - 26.dp.toPx())
+                            close()
+                        }
+                        drawPath(
+                            path = backFlame,
+                            color = Color(0xFFFFB240).copy(alpha = 0.34f * candleGlowFraction)
+                        )
+                    }
+                }
+
+                // Warm radial candlelight aura cascading down from the top-right header candle
                 if (candleGlowFraction > 0.01f) {
                     drawRect(
                         brush = Brush.radialGradient(
@@ -535,6 +595,11 @@ fun LibraryBookshelfBar(
     modifier: Modifier = Modifier
 ) {
     val colors = LocalForgeColors.current
+    val shelfCandleGlow by animateFloatAsState(
+        targetValue = if (!colors.isDark) 1f else 0f,
+        animationSpec = tween(durationMillis = 360, easing = FastOutSlowInEasing),
+        label = "shelfCandleGlow"
+    )
 
     Column(
         modifier = modifier
@@ -544,6 +609,22 @@ fun LibraryBookshelfBar(
                     colors = listOf(colors.walnutDark.copy(alpha = 0.22f), colors.libraryShelfTint)
                 )
             )
+            .drawBehind {
+                if (shelfCandleGlow > 0.01f) {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                colors.candleGlow.copy(alpha = 0.28f * shelfCandleGlow),
+                                Color.Transparent
+                            ),
+                            center = Offset(size.width * 0.86f, 0f),
+                            radius = size.width * 0.65f
+                        ),
+                        center = Offset(size.width * 0.86f, 0f),
+                        radius = size.width * 0.65f
+                    )
+                }
+            }
     ) {
         // Subtle library alcove cornice molding
         Box(
@@ -918,7 +999,7 @@ fun DocSectionCard(
             Surface(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 2.dp, bottomEnd = 2.dp),
-                color = colors.surface,
+                color = colors.surface.copy(alpha = if (colors.isDark) 0.94f else 0.91f),
                 border = BorderStroke(1.dp, colors.border),
                 shadowElevation = 0.dp
             ) {
