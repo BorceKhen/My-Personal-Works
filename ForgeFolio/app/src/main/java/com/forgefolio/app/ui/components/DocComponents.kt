@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -86,6 +87,7 @@ private val SmoothEase = tween<Float>(durationMillis = 240, easing = FastOutSlow
 fun ForgeFolioHeader(
     isDarkTheme: Boolean,
     onToggleTheme: () -> Unit,
+    onOpenAbout: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val colors = LocalForgeColors.current
@@ -96,6 +98,7 @@ fun ForgeFolioHeader(
         label = "headerCandleFlame"
     )
     val interactionSource = remember { MutableInteractionSource() }
+    val aboutInteraction = remember { MutableInteractionSource() }
 
     Row(
         modifier = modifier
@@ -128,7 +131,14 @@ fun ForgeFolioHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.clickable(
+                interactionSource = aboutInteraction,
+                indication = null,
+                onClick = onOpenAbout
+            ),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Row(
                 modifier = Modifier
                     .height(30.dp)
@@ -142,11 +152,30 @@ fun ForgeFolioHeader(
             }
             Spacer(modifier = Modifier.width(10.dp))
             Column {
-                Text(
-                    text = "FORGEFOLIO",
-                    style = ForgeTextStyles.folioDisplay,
-                    color = colors.primaryInk
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "FORGEFOLIO",
+                        style = ForgeTextStyles.folioDisplay,
+                        color = colors.primaryInk
+                    )
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(colors.libraryShelfTint)
+                            .border(1.dp, colors.brassFoilGold.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 5.dp, vertical = 1.dp)
+                    ) {
+                        Text(
+                            text = "ABOUT",
+                            style = ForgeTextStyles.monoBadge.copy(fontSize = 8.sp, lineHeight = 10.sp),
+                            fontWeight = FontWeight.Bold,
+                            color = colors.brassFoilGold
+                        )
+                    }
+                }
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))
@@ -1508,6 +1537,224 @@ fun ConversionStatusPanel(
                             Text("Share", style = ForgeTextStyles.monoBadge, color = colors.primaryInk)
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Bottom library colophon shelf card summarizing authorship & offline craft,
+ * opening the full About Us dialog when tapped.
+ */
+@Composable
+fun AboutUsShelfFooter(
+    onOpenAbout: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = LocalForgeColors.current
+    Column(modifier = modifier.fillMaxWidth()) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp)
+                .clickable(onClick = onOpenAbout),
+            shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 2.dp, bottomEnd = 2.dp),
+            color = colors.surface.copy(alpha = if (colors.isDark) 0.92f else 0.90f),
+            border = BorderStroke(1.dp, colors.border)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "ABOUT US • COLOPHON",
+                        style = ForgeTextStyles.monoBadge,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.brassFoilGold
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Crafted by Khen Borce (@BorceKhen) • v1.0.0",
+                        style = ForgeTextStyles.monoMeta,
+                        color = colors.primaryInk
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(colors.libraryShelfTint)
+                        .border(1.dp, colors.brassFoilGold.copy(alpha = 0.6f), RoundedCornerShape(5.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "Read →",
+                        style = ForgeTextStyles.monoBadge,
+                        color = colors.accentCobalt
+                    )
+                }
+            }
+        }
+
+        BookcaseShelfPlank(shelfLabel = "FORGEFOLIO • COLOPHON & ABOUT US")
+    }
+}
+
+/**
+ * Library Colophon / About Us modal presenting mission, developer credit,
+ * privacy guarantee, and local conversion engines.
+ */
+@Composable
+fun AboutForgeFolioDialog(
+    onDismiss: () -> Unit,
+    onOpenExternalUrl: (String) -> Unit
+) {
+    val colors = LocalForgeColors.current
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(10.dp),
+            color = colors.surface,
+            border = BorderStroke(1.5.dp, colors.brassFoilGold.copy(alpha = 0.75f))
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .height(24.dp)
+                                .clip(RoundedCornerShape(3.dp))
+                                .border(1.dp, colors.border, RoundedCornerShape(3.dp))
+                        ) {
+                            Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(colors.bookSpineOxblood))
+                            Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(colors.bookSpineEmerald))
+                            Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(colors.bookSpineNavy))
+                            Box(modifier = Modifier.width(3.dp).fillMaxHeight().background(colors.brassFoilGold))
+                        }
+                        Column {
+                            Text(
+                                text = "ABOUT FORGEFOLIO",
+                                style = ForgeTextStyles.sectionHeading,
+                                color = colors.primaryInk
+                            )
+                            Text(
+                                text = "VERSION 1.0.0 • 100% OFFLINE STUDIO",
+                                style = ForgeTextStyles.monoBadge.copy(fontSize = 10.sp),
+                                color = colors.brassFoilGold
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "CLOSE ✕",
+                        style = ForgeTextStyles.monoBadge,
+                        color = colors.bookSpineOxblood,
+                        modifier = Modifier
+                            .clickable(onClick = onDismiss)
+                            .padding(4.dp)
+                    )
+                }
+
+                DocCalloutBanner(
+                    title = "OUR MISSION • LOCAL ARCHIVAL PRIVACY",
+                    body = "ForgeFolio is a distraction-free, 100% offline 4-way document workshop (PDF → Image, Image → PDF with live layout, DOCX → PDF, and PDF → DOCX). No internet permissions, no cloud uploads, and no tracking.",
+                    accentColor = colors.bookSpineEmerald
+                )
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(colors.libraryShelfTint)
+                        .border(1.dp, colors.border, RoundedCornerShape(6.dp))
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "BUILT BY",
+                        style = ForgeTextStyles.monoBadge,
+                        color = colors.brassFoilGold
+                    )
+                    Text(
+                        text = "Khen Borce (CanBoarSee / @BorceKhen)",
+                        style = ForgeTextStyles.sectionHeading,
+                        color = colors.primaryInk
+                    )
+                    Text(
+                        text = "Independent CS builder crafting offline Android & Windows utilities, accessible web experiences, and tactile UI systems.",
+                        style = ForgeTextStyles.monoMeta,
+                        color = colors.secondaryInk
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = { onOpenExternalUrl("https://github.com/BorceKhen/My-Personal-Works") },
+                            shape = RoundedCornerShape(6.dp),
+                            border = BorderStroke(1.dp, colors.accentCobalt)
+                        ) {
+                            Text("GitHub Repo", style = ForgeTextStyles.monoBadge, color = colors.accentCobalt)
+                        }
+                        OutlinedButton(
+                            onClick = { onOpenExternalUrl("https://www.linkedin.com/in/borce-ron-khen-b45182380") },
+                            shape = RoundedCornerShape(6.dp),
+                            border = BorderStroke(1.dp, colors.border)
+                        ) {
+                            Text("LinkedIn", style = ForgeTextStyles.monoBadge, color = colors.primaryInk)
+                        }
+                    }
+                }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(colors.calloutTint)
+                        .border(1.dp, colors.border, RoundedCornerShape(6.dp))
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "ON-DEVICE ENGINES",
+                        style = ForgeTextStyles.monoBadge,
+                        color = colors.brassFoilGold
+                    )
+                    Text(
+                        text = "• PdfRenderer & PdfDocument (Native Android PDF)",
+                        style = ForgeTextStyles.monoMeta,
+                        color = colors.primaryInk
+                    )
+                    Text(
+                        text = "• PDFBox-Android 2.0.27.0 (Text & Structure)",
+                        style = ForgeTextStyles.monoMeta,
+                        color = colors.primaryInk
+                    )
+                    Text(
+                        text = "• Apache POI 5.2.5 (Word .docx Engine)",
+                        style = ForgeTextStyles.monoMeta,
+                        color = colors.primaryInk
+                    )
+                    Text(
+                        text = "• ExifInterface 1.4.2 & SAF Scoped Storage",
+                        style = ForgeTextStyles.monoMeta,
+                        color = colors.primaryInk
+                    )
                 }
             }
         }

@@ -1,6 +1,7 @@
 package com.forgefolio.app
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -33,6 +34,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.forgefolio.app.model.ConversionResult
 import com.forgefolio.app.model.ForgeTab
 import com.forgefolio.app.ui.ConverterViewModel
+import com.forgefolio.app.ui.components.AboutForgeFolioDialog
+import com.forgefolio.app.ui.components.AboutUsShelfFooter
 import com.forgefolio.app.ui.components.ConversionStatusPanel
 import com.forgefolio.app.ui.components.ForgeFolioHeader
 import com.forgefolio.app.ui.components.LibraryBookcaseBody
@@ -71,6 +74,16 @@ fun ForgeFolioAppScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val colors = LocalForgeColors.current
     val context = LocalContext.current
+    var showAboutDialog by rememberSaveable { mutableStateOf(false) }
+
+    fun openExternalUrl(url: String) {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+        runCatching {
+            context.startActivity(intent)
+        }.onFailure {
+            Toast.makeText(context, "Unable to open link", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     fun openUri(uri: android.net.Uri, displayName: String, mimeType: String, isFolderTree: Boolean) {
         val intent = Intent(Intent.ACTION_VIEW).apply {
@@ -119,7 +132,8 @@ fun ForgeFolioAppScreen(
     ) {
         ForgeFolioHeader(
             isDarkTheme = isDarkTheme,
-            onToggleTheme = onToggleTheme
+            onToggleTheme = onToggleTheme,
+            onOpenAbout = { showAboutDialog = true }
         )
 
         HorizontalDivider(thickness = 1.dp, color = colors.border)
@@ -174,8 +188,19 @@ fun ForgeFolioAppScreen(
                     modifier = Modifier.padding(horizontal = 10.dp)
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                AboutUsShelfFooter(
+                    onOpenAbout = { showAboutDialog = true }
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
             }
         }
+    }
+
+    if (showAboutDialog) {
+        AboutForgeFolioDialog(
+            onDismiss = { showAboutDialog = false },
+            onOpenExternalUrl = ::openExternalUrl
+        )
     }
 }
