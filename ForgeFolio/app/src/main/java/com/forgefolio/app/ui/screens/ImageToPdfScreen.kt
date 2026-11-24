@@ -212,7 +212,7 @@ fun ImageToPdfScreen(
                 modifier = Modifier.fillMaxWidth().height(46.dp)
             ) {
                 Text(
-                    text = "Compile ${state.selectedImages.size} Plate(s) to PDF",
+                    text = "Export ${state.selectedImages.size} Plate(s) to PDF",
                     style = ForgeTextStyles.monoBadge
                 )
             }
@@ -240,7 +240,7 @@ private fun SmallOrderBtn(
 ) {
     val colors = LocalForgeColors.current
     val fg = when {
-        !enabled -> colors.border
+        !enabled -> colors.secondaryInk.copy(alpha = 0.35f)
         isDanger -> colors.bookSpineOxblood
         else -> colors.primaryInk
     }

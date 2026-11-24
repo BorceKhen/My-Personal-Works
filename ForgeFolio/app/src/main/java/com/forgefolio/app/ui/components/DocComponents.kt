@@ -1003,103 +1003,95 @@ fun DocSectionCard(
                 border = BorderStroke(1.dp, colors.border),
                 shadowElevation = 0.dp
             ) {
-                Row(
+                // Draw the left leather spine & gilt ribs via drawBehind instead of IntrinsicSize.Min
+                // so multi-line FlowRow blocks never get height-clipped at the bottom.
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(IntrinsicSize.Min)
+                        .drawBehind {
+                            val spineW = 7.dp.toPx()
+                            drawRect(
+                                color = effectiveSpine,
+                                topLeft = Offset.Zero,
+                                size = Size(spineW, size.height)
+                            )
+                            val ribH = 2.dp.toPx()
+                            val ribOffset = 12.dp.toPx()
+                            drawRect(
+                                color = colors.brassFoilGold,
+                                topLeft = Offset(0f, ribOffset),
+                                size = Size(spineW, ribH)
+                            )
+                            drawRect(
+                                color = colors.brassFoilGold,
+                                topLeft = Offset(0f, (size.height - ribOffset - ribH).coerceAtLeast(ribOffset + ribH)),
+                                size = Size(spineW, ribH)
+                            )
+                        }
+                        .padding(start = 21.dp, top = 14.dp, end = 14.dp, bottom = 14.dp)
                 ) {
-                    // Left bound leather spine with twin gold-foil ribs
-                    Column(
+                    Row(
                         modifier = Modifier
-                            .width(7.dp)
-                            .fillMaxHeight()
-                            .background(effectiveSpine),
-                        verticalArrangement = Arrangement.SpaceBetween
+                            .fillMaxWidth()
+                            .clickable(
+                                interactionSource = interactionSource,
+                                indication = null,
+                                onClick = { expanded = !expanded }
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .padding(top = 12.dp)
-                                .fillMaxWidth()
-                                .height(2.dp)
-                                .background(colors.brassFoilGold)
-                        )
-                        Box(
-                            modifier = Modifier
-                                .padding(bottom = 12.dp)
-                                .fillMaxWidth()
-                                .height(2.dp)
-                                .background(colors.brassFoilGold)
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(colors.libraryShelfTint)
+                                    .border(1.dp, colors.border, RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = "VOL.$sectionNumber",
+                                    style = ForgeTextStyles.monoBadge,
+                                    color = effectiveSpine
+                                )
+                            }
+                            Text(
+                                text = title,
+                                style = ForgeTextStyles.sectionHeading,
+                                color = colors.primaryInk,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+
+                        Text(
+                            text = if (expanded) "▾" else "▸",
+                            style = ForgeTextStyles.monoMeta,
+                            color = colors.brassFoilGold
                         )
                     }
 
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(14.dp)
+                    if (!subtitle.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = subtitle,
+                            style = ForgeTextStyles.monoMeta,
+                            color = colors.secondaryInk
+                        )
+                    }
+
+                    AnimatedVisibility(
+                        visible = expanded,
+                        enter = fadeIn(tween(180, easing = FastOutSlowInEasing)),
+                        exit = fadeOut(tween(140, easing = FastOutSlowInEasing))
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable(
-                                    interactionSource = interactionSource,
-                                    indication = null,
-                                    onClick = { expanded = !expanded }
-                                ),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(
-                                modifier = Modifier.weight(1f),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(colors.libraryShelfTint)
-                                        .border(1.dp, colors.border, RoundedCornerShape(4.dp))
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "VOL.$sectionNumber",
-                                        style = ForgeTextStyles.monoBadge,
-                                        color = effectiveSpine
-                                    )
-                                }
-                                Text(
-                                    text = title,
-                                    style = ForgeTextStyles.sectionHeading,
-                                    color = colors.primaryInk,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-
-                            Text(
-                                text = if (expanded) "▾" else "▸",
-                                style = ForgeTextStyles.monoMeta,
-                                color = colors.brassFoilGold
-                            )
-                        }
-
-                        if (!subtitle.isNullOrBlank()) {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = subtitle,
-                                style = ForgeTextStyles.monoMeta,
-                                color = colors.secondaryInk
-                            )
-                        }
-
-                        AnimatedVisibility(
-                            visible = expanded,
-                            enter = fadeIn(tween(180, easing = FastOutSlowInEasing)),
-                            exit = fadeOut(tween(140, easing = FastOutSlowInEasing))
-                        ) {
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                Spacer(modifier = Modifier.height(12.dp))
-                                content()
-                            }
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            content()
                         }
                     }
                 }
@@ -1354,41 +1346,36 @@ fun DocCalloutBanner(
     val colors = LocalForgeColors.current
     val barColor = accentColor ?: colors.accentCobalt
 
-    Row(
+    Column(
         modifier = modifier
             .fillMaxWidth()
-            .height(IntrinsicSize.Min)
             .clip(RoundedCornerShape(6.dp))
             .background(colors.calloutTint)
             .border(1.dp, colors.border, RoundedCornerShape(6.dp))
-    ) {
-        Box(
-            modifier = Modifier
-                .width(3.dp)
-                .fillMaxHeight()
-                .background(barColor)
-        )
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 12.dp, vertical = 10.dp)
-        ) {
-            Text(
-                text = title,
-                style = ForgeTextStyles.monoBadge,
-                fontWeight = FontWeight.Bold,
-                color = barColor
-            )
-            Spacer(modifier = Modifier.height(3.dp))
-            Text(
-                text = body,
-                style = ForgeTextStyles.monoMeta,
-                color = colors.primaryInk
-            )
-            if (trailingContent != null) {
-                Spacer(modifier = Modifier.height(10.dp))
-                trailingContent()
+            .drawBehind {
+                drawRect(
+                    color = barColor,
+                    topLeft = Offset.Zero,
+                    size = Size(3.dp.toPx(), size.height)
+                )
             }
+            .padding(start = 15.dp, top = 10.dp, end = 12.dp, bottom = 10.dp)
+    ) {
+        Text(
+            text = title,
+            style = ForgeTextStyles.monoBadge,
+            fontWeight = FontWeight.Bold,
+            color = barColor
+        )
+        Spacer(modifier = Modifier.height(3.dp))
+        Text(
+            text = body,
+            style = ForgeTextStyles.monoMeta,
+            color = colors.primaryInk
+        )
+        if (trailingContent != null) {
+            Spacer(modifier = Modifier.height(10.dp))
+            trailingContent()
         }
     }
 }
