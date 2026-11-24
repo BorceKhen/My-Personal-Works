@@ -11,7 +11,11 @@ import com.forgefolio.app.model.ConversionResult
 import com.forgefolio.app.model.DocxDocumentInfo
 import com.forgefolio.app.model.ForgeTab
 import com.forgefolio.app.model.ImageOutputFormat
+import com.forgefolio.app.model.ImagePageLayout
+import com.forgefolio.app.model.ImagePageMargin
+import com.forgefolio.app.model.ImagePdfLayoutEngine
 import com.forgefolio.app.model.ImageScaleMode
+import com.forgefolio.app.model.ImageSlotAlignment
 import com.forgefolio.app.model.MarginPreset
 import com.forgefolio.app.model.PageOrientation
 import com.forgefolio.app.model.PageRangeParser
@@ -52,6 +56,10 @@ data class ConverterUiState(
     val imgToPdfPaper: PaperSizePreset = PaperSizePreset.SHORT_BOND,
     val imgToPdfOrientation: PageOrientation = PageOrientation.PORTRAIT,
     val imgToPdfScaleMode: ImageScaleMode = ImageScaleMode.FIT_INSIDE,
+    val imgToPdfLayout: ImagePageLayout = ImagePageLayout.SINGLE,
+    val imgToPdfMargin: ImagePageMargin = ImagePageMargin.NARROW,
+    val imgToPdfAlignment: ImageSlotAlignment = ImageSlotAlignment.CENTER,
+    val imgToPdfPreviewPage: Int = 0,
 
     // Tab 3: DOCX -> PDF
     val docxToPdfInfo: DocxDocumentInfo? = null,
@@ -197,6 +205,20 @@ class ConverterViewModel(application: Application) : AndroidViewModel(applicatio
             if (index !in state.selectedImages.indices) return@update state
             val mutable = state.selectedImages.toMutableList()
             mutable.removeAt(index)
+            val maxPage = (ImagePdfLayoutEngine.paginate(mutable, state.imgToPdfLayout).size - 1).coerceAtLeast(0)
+            state.copy(
+                selectedImages = mutable,
+                imgToPdfPreviewPage = state.imgToPdfPreviewPage.coerceIn(0, maxPage)
+            )
+        }
+    }
+
+    fun rotateImageAt(index: Int) {
+        _uiState.update { state ->
+            if (index !in state.selectedImages.indices) return@update state
+            val mutable = state.selectedImages.toMutableList()
+            val item = mutable[index]
+            mutable[index] = item.copy(rotationDegrees = (item.rotationDegrees + 90) % 360)
             state.copy(selectedImages = mutable)
         }
     }
@@ -204,6 +226,23 @@ class ConverterViewModel(application: Application) : AndroidViewModel(applicatio
     fun updateImgToPdfPaper(paper: PaperSizePreset) = _uiState.update { it.copy(imgToPdfPaper = paper) }
     fun updateImgToPdfOrientation(orientation: PageOrientation) = _uiState.update { it.copy(imgToPdfOrientation = orientation) }
     fun updateImgToPdfScaleMode(mode: ImageScaleMode) = _uiState.update { it.copy(imgToPdfScaleMode = mode) }
+    fun updateImgToPdfLayout(layout: ImagePageLayout) {
+        _uiState.update { state ->
+            val maxPage = (ImagePdfLayoutEngine.paginate(state.selectedImages, layout).size - 1).coerceAtLeast(0)
+            state.copy(
+                imgToPdfLayout = layout,
+                imgToPdfPreviewPage = state.imgToPdfPreviewPage.coerceIn(0, maxPage)
+            )
+        }
+    }
+    fun updateImgToPdfMargin(margin: ImagePageMargin) = _uiState.update { it.copy(imgToPdfMargin = margin) }
+    fun updateImgToPdfAlignment(alignment: ImageSlotAlignment) = _uiState.update { it.copy(imgToPdfAlignment = alignment) }
+    fun stepImgToPdfPreviewPage(delta: Int) {
+        _uiState.update { state ->
+            val maxPage = (ImagePdfLayoutEngine.paginate(state.selectedImages, state.imgToPdfLayout).size - 1).coerceAtLeast(0)
+            state.copy(imgToPdfPreviewPage = (state.imgToPdfPreviewPage + delta).coerceIn(0, maxPage))
+        }
+    }
 
     fun executeImagesToPdf(outputUri: Uri) {
         val snapshot = _uiState.value
@@ -215,6 +254,9 @@ class ConverterViewModel(application: Application) : AndroidViewModel(applicatio
                 paperPreset = snapshot.imgToPdfPaper,
                 orientation = snapshot.imgToPdfOrientation,
                 scaleMode = snapshot.imgToPdfScaleMode,
+                layout = snapshot.imgToPdfLayout,
+                margin = snapshot.imgToPdfMargin,
+                alignment = snapshot.imgToPdfAlignment,
                 outputUri = outputUri,
                 onProgress = ::emitProgress
             )

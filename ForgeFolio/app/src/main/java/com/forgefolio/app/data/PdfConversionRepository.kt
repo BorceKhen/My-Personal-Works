@@ -4,14 +4,20 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import com.forgefolio.app.model.ConversionResult
 import com.forgefolio.app.model.ImageOutputFormat
+import com.forgefolio.app.model.ImagePageLayout
+import com.forgefolio.app.model.ImagePageMargin
+import com.forgefolio.app.model.ImagePdfLayoutEngine
 import com.forgefolio.app.model.ImageScaleMode
+import com.forgefolio.app.model.ImageSlotAlignment
 import com.forgefolio.app.model.PageOrientation
 import com.forgefolio.app.model.PageRangeParser
 import com.forgefolio.app.model.PaperSizePreset
@@ -171,42 +177,80 @@ class PdfConversionRepository(private val context: Context) {
         paperPreset: PaperSizePreset,
         orientation: PageOrientation,
         scaleMode: ImageScaleMode,
+        layout: ImagePageLayout,
+        margin: ImagePageMargin,
+        alignment: ImageSlotAlignment,
         outputUri: Uri,
         onProgress: (current: Int, total: Int, message: String) -> Unit
     ): ConversionResult {
         require(images.isNotEmpty()) { "Select at least one image to convert." }
 
+        val pages = ImagePdfLayoutEngine.paginate(images, layout)
+        val totalPages = pages.size
         val pdfDocument = PdfDocument()
         try {
-            val total = images.size
-            images.forEachIndexed { index, item ->
+            pages.forEachIndexed { pageIndex, pageItems ->
                 coroutineContext.ensureActive()
                 onProgress(
-                    index + 1,
-                    total,
-                    "[${pad2(index + 1)}/${pad2(total)}] Embedding ${item.displayName}..."
+                    pageIndex + 1,
+                    totalPages,
+                    "[${pad2(pageIndex + 1)}/${pad2(totalPages)}] Laying out PDF page ${pageIndex + 1} (${pageItems.size} plate(s))..."
                 )
 
-                val bitmap = SafFileHelper.decodeSampledBitmapWithExif(context, item.uri, 2480)
-                try {
-                    val (pageW, pageH) = resolvePageSize(bitmap, paperPreset, orientation)
-                    val pageInfo = PdfDocument.PageInfo.Builder(pageW, pageH, index + 1).create()
-                    val page = pdfDocument.startPage(pageInfo)
-                    val canvas = page.canvas
-                    canvas.drawColor(Color.WHITE)
+                val (refW, refH) = pageItems.first().effectiveDimensions()
+                val (pageW, pageH) = ImagePdfLayoutEngine.resolvePageDimensionsPt(
+                    refWidthPx = refW,
+                    refHeightPx = refH,
+                    preset = paperPreset,
+                    orientation = orientation
+                )
 
-                    val dstRect = computeImageRect(
-                        srcW = bitmap.width,
-                        srcH = bitmap.height,
-                        dstW = pageW,
-                        dstH = pageH,
-                        scaleMode = scaleMode
-                    )
-                    canvas.drawBitmap(bitmap, null, dstRect, null)
-                    pdfDocument.finishPage(page)
-                } finally {
-                    bitmap.recycle()
+                val pageInfo = PdfDocument.PageInfo.Builder(pageW, pageH, pageIndex + 1).create()
+                val page = pdfDocument.startPage(pageInfo)
+                val canvas = page.canvas
+                canvas.drawColor(Color.WHITE)
+
+                val slotRects = ImagePdfLayoutEngine.computeSlotRects(
+                    pageW = pageW.toFloat(),
+                    pageH = pageH.toFloat(),
+                    marginPt = margin.marginPt.toFloat(),
+                    gapPt = 12f,
+                    layout = layout,
+                    orientation = orientation
+                )
+
+                val maxEdge = if (layout == ImagePageLayout.SINGLE) 2480 else 1600
+                pageItems.forEachIndexed { slotIdx, item ->
+                    coroutineContext.ensureActive()
+                    val slot = slotRects[slotIdx]
+                    val baseBmp = SafFileHelper.decodeSampledBitmapWithExif(context, item.uri, maxEdge)
+                    val orientedBmp = rotateBitmapIfNeeded(baseBmp, item.rotationDegrees)
+                    try {
+                        val dst = ImagePdfLayoutEngine.computeImageRectInSlot(
+                            srcW = orientedBmp.width,
+                            srcH = orientedBmp.height,
+                            slot = slot,
+                            scaleMode = scaleMode,
+                            alignment = alignment
+                        )
+                        canvas.save()
+                        canvas.clipRect(slot.left, slot.top, slot.right, slot.bottom)
+                        canvas.drawBitmap(
+                            orientedBmp,
+                            null,
+                            RectF(dst.left, dst.top, dst.right, dst.bottom),
+                            null
+                        )
+                        canvas.restore()
+                    } finally {
+                        if (orientedBmp !== baseBmp) {
+                            orientedBmp.recycle()
+                        }
+                        baseBmp.recycle()
+                    }
                 }
+
+                pdfDocument.finishPage(page)
             }
 
             context.contentResolver.openOutputStream(outputUri)?.use { out ->
@@ -221,8 +265,15 @@ class PdfConversionRepository(private val context: Context) {
             uri = outputUri,
             displayName = outName,
             mimeType = "application/pdf",
-            summary = "Compiled ${images.size} image(s) into ${paperPreset.label} (${orientation.label}) • ${PageRangeParser.formatBytes(outSize)}."
+            summary = "Compiled ${images.size} plate(s) across $totalPages page(s) • ${paperPreset.label} (${layout.label}) • ${PageRangeParser.formatBytes(outSize)}."
         )
+    }
+
+    private fun rotateBitmapIfNeeded(source: Bitmap, rotationDegrees: Int): Bitmap {
+        val norm = ((rotationDegrees % 360) + 360) % 360
+        if (norm == 0) return source
+        val matrix = Matrix().apply { postRotate(norm.toFloat()) }
+        return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
     }
 
     private fun renderPageToBytes(
@@ -250,45 +301,6 @@ class PdfConversionRepository(private val context: Context) {
                 bitmap.recycle()
             }
         }
-    }
-
-    private fun resolvePageSize(
-        bitmap: Bitmap,
-        preset: PaperSizePreset,
-        orientation: PageOrientation
-    ): Pair<Int, Int> {
-        if (preset != PaperSizePreset.FIT_TO_IMAGE) {
-            return preset.orientedSize(orientation)
-        }
-        val maxPt = 1440f
-        val scale = min(1f, min(maxPt / bitmap.width, maxPt / bitmap.height))
-        var w = (bitmap.width * scale).roundToInt().coerceAtLeast(72)
-        var h = (bitmap.height * scale).roundToInt().coerceAtLeast(72)
-        if (orientation == PageOrientation.LANDSCAPE && h > w) {
-            val tmp = w; w = h; h = tmp
-        } else if (orientation == PageOrientation.PORTRAIT && w > h) {
-            val tmp = w; w = h; h = tmp
-        }
-        return w to h
-    }
-
-    private fun computeImageRect(
-        srcW: Int,
-        srcH: Int,
-        dstW: Int,
-        dstH: Int,
-        scaleMode: ImageScaleMode
-    ): Rect {
-        val scale = if (scaleMode == ImageScaleMode.FIT_INSIDE) {
-            min(dstW.toFloat() / srcW, dstH.toFloat() / srcH)
-        } else {
-            max(dstW.toFloat() / srcW, dstH.toFloat() / srcH)
-        }
-        val drawW = (srcW * scale).roundToInt()
-        val drawH = (srcH * scale).roundToInt()
-        val left = (dstW - drawW) / 2
-        val top = (dstH - drawH) / 2
-        return Rect(left, top, left + drawW, top + drawH)
     }
 
     private fun pad2(v: Int): String = String.format("%02d", v)
