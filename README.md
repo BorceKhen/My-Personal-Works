@@ -5,9 +5,9 @@
 **Offline Android & Windows Utilities · Interactive UI Systems · Creative Tools**
 
 <p>
-  <img src="https://img.shields.io/badge/Android-Kotlin_%26_Compose-151C36?style=for-the-badge&logo=android&logoColor=8FA1F7" alt="Android Kotlin & Compose" />
-  <img src="https://img.shields.io/badge/Desktop-Python_%26_PyQt6-151C36?style=for-the-badge&logo=python&logoColor=F5B841" alt="Desktop Python & PyQt6" />
-  <img src="https://img.shields.io/badge/Local--First-Zero_Cloud_Required-151C36?style=for-the-badge&logo=shield&logoColor=8FA1F7" alt="Local-First" />
+  <img src="https://img.shields.io/badge/Android-Kotlin_%26_Compose-132A3A?style=for-the-badge&labelColor=0F1B2E&logo=android&logoColor=38BDF8" alt="Android Kotlin & Compose" />
+  <img src="https://img.shields.io/badge/Desktop-Python_%26_PyQt6-132A3A?style=for-the-badge&labelColor=0F1B2E&logo=python&logoColor=F5C542" alt="Desktop Python & PyQt6" />
+  <img src="https://img.shields.io/badge/Local--First-Zero_Cloud_Required-132A3A?style=for-the-badge&labelColor=0F1B2E&logo=shield&logoColor=67E8F9" alt="Local-First" />
 </p>
 
 </div>
